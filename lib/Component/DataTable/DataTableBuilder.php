@@ -1,16 +1,12 @@
 <?php
 
-namespace CsrDelft\view\datatable;
+namespace CsrDelft\Component\DataTable;
 
-use CsrDelft\common\ContainerFacade;
 use CsrDelft\common\Doctrine\Type\DateTimeImmutableType;
-use CsrDelft\Component\DataTable\CustomDataTableEntry;
+use CsrDelft\view\datatable\CellRender;
+use CsrDelft\view\datatable\CellType;
 use CsrDelft\view\datatable\knoppen\DataTableKnop;
 use CsrDelft\view\datatable\knoppen\DataTableRowKnop;
-use CsrDelft\view\formulier\FormElement;
-use CsrDelft\view\ToHtmlResponse;
-use CsrDelft\view\ToResponse;
-use CsrDelft\view\View;
 use Doctrine\DBAL\Types\BooleanType;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\Mapping\ClassMetadata;
@@ -25,8 +21,7 @@ use Doctrine\ORM\Mapping\ClassMetadata;
  * @see http://www.datatables.net/
  *
  */
-class DataTable implements View, FormElement, ToResponse {
-	use ToHtmlResponse;
+class DataTableBuilder {
 	const POST_SELECTION = 'DataTableSelection';
 
 	public $model;
@@ -72,55 +67,27 @@ class DataTable implements View, FormElement, ToResponse {
 	private $columns = array();
 	private $groupByColumn;
 
-	public function __construct($orm, $dataUrl, $titel = false, $groupByColumn = null) {
-		$this->model = new $orm();
-		$this->titel = $titel;
+	public function __construct() {
+	}
 
-		$this->dataUrl = $dataUrl;
-		$this->dataTableId = uniqid_safe(classNameZonderNamespace($orm));
-		$this->groupByColumn = $groupByColumn;
-
-		// create group expand / collapse column
-		$this->columns['details'] = array(
-			'name' => 'details',
-			'data' => 'details',
-			'title' => '',
-			'type' => 'string',
-			'orderable' => false,
-			'searchable' => false,
-			'defaultContent' => ''
-		);
-
-		if (is_a($orm, CustomDataTableEntry::class, true)) {
-			foreach ($orm::getFieldNames() as $attribute) {
+	public function loadFromMetadata(ClassMetadata $metadata) {
+		// generate columns from entity attributes
+		foreach ($metadata->getFieldNames() as $attribute) {
+			$type = Type::getTypeRegistry()->get($metadata->getTypeOfField($attribute));
+			if ($type instanceof DateTimeImmutableType) {
+				$this->addColumn($attribute, null, null, CellRender::DateTime());
+			} elseif ($type instanceof BooleanType) {
+				$this->addColumn($attribute, null, null, CellRender::Check());
+			} else {
 				$this->addColumn($attribute);
 			}
-
-			foreach ($orm::getIdentifierFieldNames() as $attribute) {
-				$this->hideColumn($attribute);
-			}
-		} else {
-			$manager = ContainerFacade::getContainer()->get('doctrine')->getManager();
-			/** @var ClassMetadata $metadata */
-			$metadata = $manager->getClassMetaData($orm);
-
-			// generate columns from entity attributes
-			foreach ($metadata->getFieldNames() as $attribute) {
-				$type = Type::getTypeRegistry()->get($metadata->getTypeOfField($attribute));
-				if ($type instanceof DateTimeImmutableType) {
-					$this->addColumn($attribute, null, null, CellRender::DateTime());
-				} elseif ($type instanceof BooleanType) {
-					$this->addColumn($attribute, null, null, CellRender::Check());
-				} else {
-					$this->addColumn($attribute);
-				}
-			}
-
-			// hide primary key columns
-			foreach ($metadata->getIdentifierFieldNames() as $attribute) {
-				$this->hideColumn($attribute);
-			}
 		}
+
+		// hide primary key columns
+		foreach ($metadata->getIdentifierFieldNames() as $attribute) {
+			$this->hideColumn($attribute);
+		}
+
 	}
 
 	/**
@@ -326,10 +293,6 @@ class DataTable implements View, FormElement, ToResponse {
 		return $this->settings;
 	}
 
-	public function view() {
-		echo $this->getHtml();
-	}
-
 	public function getTitel() {
 		return $this->titel;
 	}
@@ -349,20 +312,34 @@ class DataTable implements View, FormElement, ToResponse {
 		return classNameZonderNamespace(get_class($this));
 	}
 
-	public function getHtml() {
-		$id = str_replace(' ', '-', strtolower($this->getTitel()));
-
-		$settingsJson = htmlspecialchars(json_encode($this->getSettings(), DEBUG ? JSON_PRETTY_PRINT : 0));
-
-		return <<<HTML
-<h2 id="table-{$id}" class="Titel">{$this->getTitel()}</h2>
-
-<table id="{$this->dataTableId}" class="ctx-datatable display" data-settings="{$settingsJson}"></table>
-HTML;
+	public function getTable() {
+		return new DataTableInstance($this->getTitel(), $this->getDataTableId(), $this->getSettings());
 	}
 
-	public function getJavascript() {
-		//Nothing should be returned here because the script is already embedded in getView
-		return "";
+	public function setTitel($titel) {
+		$this->titel = $titel;
 	}
+
+	// create group expand / collapse column
+	public function addDefaultDetailsColumn() {
+		$this->columns['details'] = array(
+			'name' => 'details',
+			'data' => 'details',
+			'title' => '',
+			'type' => 'string',
+			'orderable' => false,
+			'searchable' => false,
+			'defaultContent' => ''
+		);
+	}
+
+	public function setTableId($tableId) {
+		$this->dataTableId = $tableId;
+	}
+
+	public function setDataUrl($dataUrl) {
+		$this->dataUrl = $dataUrl;
+	}
+
+
 }

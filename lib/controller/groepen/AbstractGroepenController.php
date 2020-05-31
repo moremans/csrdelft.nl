@@ -5,7 +5,7 @@ namespace CsrDelft\controller\groepen;
 use CsrDelft\common\ContainerFacade;
 use CsrDelft\common\CsrGebruikerException;
 use CsrDelft\common\CsrToegangException;
-use CsrDelft\common\datatable\RemoveDataTableEntry;
+use CsrDelft\Component\DataTable\RemoveDataTableEntry;
 use CsrDelft\controller\AbstractController;
 use CsrDelft\entity\groepen\AbstractGroep;
 use CsrDelft\entity\groepen\AbstractGroepLid;

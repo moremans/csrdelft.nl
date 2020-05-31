@@ -3,6 +3,7 @@
 
 namespace CsrDelft;
 
+use CsrDelft\Component\DataTable\DataTableTypeInterface;
 use Exception;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\Exception\LoaderLoadException;
@@ -70,5 +71,9 @@ class Kernel extends BaseKernel {
 		$routes->import($confDir . '/{routes}/' . $this->environment . '/**/*' . self::CONFIG_EXTS, '/', 'glob');
 		$routes->import($confDir . '/{routes}/*' . self::CONFIG_EXTS, '/', 'glob');
 		$routes->import($confDir . '/{routes}' . self::CONFIG_EXTS, '/', 'glob');
+	}
+
+	protected function build(ContainerBuilder $builder) {
+		$builder->registerForAutoconfiguration(DataTableTypeInterface::class)->addTag('csr.table.type');
 	}
 }

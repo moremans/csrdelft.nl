@@ -4,6 +4,7 @@
 namespace CsrDelft\controller;
 
 use CsrDelft\common\CsrToegangException;
+use CsrDelft\Component\DataTable\DataTableFactory;
 use CsrDelft\view\datatable\DataTable;
 use CsrDelft\view\datatable\GenericDataTableResponse;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController as BaseController;
@@ -15,6 +16,12 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  * @package CsrDelft\controller
  */
 class AbstractController extends BaseController {
+	public static function getSubscribedServices() {
+		return parent::getSubscribedServices() + [
+				'csr.table.factory' => DataTableFactory::class,
+			];
+	}
+
 	/**
 	 * Haal de DataTable selectie uit POST.
 	 *
@@ -39,23 +46,30 @@ class AbstractController extends BaseController {
 	 * @param bool $allowExternal
 	 * @return RedirectResponse
 	 */
-	protected function csrRedirect($url, $status = 302, $allowExternal = false)
-	{
-			if (empty($url) || $url === null) {
-				$url = REQUEST_URI;
+	protected function csrRedirect($url, $status = 302, $allowExternal = false) {
+		if (empty($url) || $url === null) {
+			$url = REQUEST_URI;
+		}
+		if (!startsWith($url, CSR_ROOT) && !$allowExternal) {
+			if (preg_match("/^[?#\/]/", $url) === 1) {
+				$url = CSR_ROOT . $url;
+			} else {
+				throw new CsrToegangException();
 			}
-			if (!startsWith($url, CSR_ROOT) && !$allowExternal) {
-				if (preg_match("/^[?#\/]/", $url) === 1) {
-					$url = CSR_ROOT . $url;
-				} else {
-					throw new CsrToegangException();
-				}
-			}
-			return parent::redirect($url, $status);
+		}
+		return parent::redirect($url, $status);
 
 	}
 
 	protected function tableData($data) {
 		return new GenericDataTableResponse($this->get('serializer'), $data);
+	}
+
+	protected function createDataTable($entityType, $dataUrl) {
+		return $this->container->get(DataTableFactory::class)->create($entityType, $dataUrl)->getTable();
+	}
+
+	protected function createDataTableWithType($type) {
+		return $this->container->get(DataTableFactory::class)->createWithType($type)->getTable();
 	}
 }

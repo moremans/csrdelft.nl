@@ -22,6 +22,7 @@ use CsrDelft\view\fiscaat\pin\PinBestellingVeranderenForm;
 use CsrDelft\view\fiscaat\pin\PinBestellingVerwijderenForm;
 use CsrDelft\view\fiscaat\pin\PinTransactieMatchTable;
 use CsrDelft\view\fiscaat\pin\PinTransactieMatchTableResponse;
+use CsrDelft\view\fiscaat\pin\PinTransactieMatchTableType;
 use CsrDelft\view\renderer\TemplateView;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -67,7 +68,7 @@ class PinTransactieController extends AbstractController {
 	public function overzicht() {
 		return view('fiscaat.pagina', [
 			'titel' => 'Pin transacties beheer',
-			'view' => new PinTransactieMatchTable(),
+			'view' => $this->createDataTableWithType(PinTransactieMatchTableType::class),
 		]);
 	}
 

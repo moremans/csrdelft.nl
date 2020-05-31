@@ -4,7 +4,7 @@ namespace CsrDelft\controller;
 
 use CsrDelft\common\Annotation\Auth;
 use CsrDelft\common\CsrToegangException;
-use CsrDelft\common\datatable\RemoveDataTableEntry;
+use CsrDelft\Component\DataTable\RemoveDataTableEntry;
 use CsrDelft\entity\security\LoginSession;
 use CsrDelft\entity\security\RememberLogin;
 use CsrDelft\repository\security\LoginSessionRepository;

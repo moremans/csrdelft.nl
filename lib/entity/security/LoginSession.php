@@ -2,8 +2,7 @@
 
 namespace CsrDelft\entity\security;
 
-use CsrDelft\common\datatable\DataTableEntry;
-use CsrDelft\entity\profiel\Profiel;
+use CsrDelft\Component\DataTable\DataTableEntry;
 use CsrDelft\entity\security\enum\AuthenticationMethod;
 use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;

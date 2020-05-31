@@ -2,7 +2,7 @@
 
 namespace CsrDelft\entity\fiscaat;
 
-use CsrDelft\common\datatable\DataTableEntry;
+use CsrDelft\Component\DataTable\DataTableEntry;
 use CsrDelft\repository\ProfielRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation as Serializer;

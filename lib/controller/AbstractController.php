@@ -5,6 +5,7 @@ namespace CsrDelft\controller;
 
 use CsrDelft\common\CsrToegangException;
 use CsrDelft\Component\DataTable\DataTableFactory;
+use CsrDelft\Component\DataTable\DataTableInstance;
 use CsrDelft\view\datatable\DataTable;
 use CsrDelft\view\datatable\GenericDataTableResponse;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController as BaseController;
@@ -66,10 +67,13 @@ class AbstractController extends BaseController {
 	}
 
 	protected function createDataTable($entityType, $dataUrl) {
-		return $this->container->get(DataTableFactory::class)->create($entityType, $dataUrl)->getTable();
+		return $this->container->get('csr.table.factory')->create($entityType, $dataUrl)->getTable();
 	}
 
+	/**
+	 * @return DataTableInstance
+	 */
 	protected function createDataTableWithType($type) {
-		return $this->container->get(DataTableFactory::class)->createWithType($type)->getTable();
+		return $this->container->get('csr.table.factory')->createWithType($type)->getTable();
 	}
 }

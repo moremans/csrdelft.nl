@@ -126,4 +126,20 @@ class PinTransactieMatch {
 			throw new CsrException('Pin Transactie Match heeft geen bestelling en transactie.');
 		}
 	}
+
+	public function getTransactie() {
+		if ($this->transactie) {
+			return $this->transactie->getKorteBeschrijving();
+		}
+
+		return '-';
+	}
+
+	public function getBestelling() {
+		if ($this->bestelling) {
+			return $this->bestelling->getPinBeschrijving();
+		}
+
+		return '-';
+	}
 }

@@ -5,5 +5,5 @@
 @section('content')
 	@parent
 
-	@php($content->view())
+	{!! $content !!}
 @endsection

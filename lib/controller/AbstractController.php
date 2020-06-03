@@ -66,16 +66,12 @@ class AbstractController extends BaseController {
 		return new GenericDataTableResponse($this->get('serializer'), $data);
 	}
 
-	protected function createDataTable($entityType, $dataUrl) {
-		return $this->container->get('csr.table.factory')->create($entityType, $dataUrl)->getTable();
-	}
-
 	/**
 	 * @param $type
 	 * @param array $options
 	 * @return DataTableInstance
 	 */
-	protected function createDataTableWithType($type, $options = []) {
-		return $this->container->get('csr.table.factory')->createWithType($type, $options)->getTable();
+	protected function createDataTable($type, $options = []) {
+		return $this->container->get('csr.table.factory')->create($type, $options)->getTable();
 	}
 }

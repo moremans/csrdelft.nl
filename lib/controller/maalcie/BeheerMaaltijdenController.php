@@ -117,7 +117,7 @@ class BeheerMaaltijdenController extends AbstractController {
 	 * @return TemplateView
 	 * @throws ORMException
 	 * @throws OptimisticLockException
-	 * @Route("/maaltijden/beheer/{maaltijd_id}", methods={"GET"}, defaults={"maaltijd_id"=null})
+	 * @Route("/maaltijden/beheer/{maaltijd_id<\d+>}", methods={"GET"}, defaults={"maaltijd_id"=null})
 	 * @Auth(P_MAAL_MOD)
 	 */
 	public function GET_beheer($maaltijd_id = null) {
@@ -127,7 +127,7 @@ class BeheerMaaltijdenController extends AbstractController {
 		}
 
 		$repetities = $this->maaltijdRepetitiesRepository->findAll();
-		$table = $this->createDataTableWithType(BeheerMaaltijdenTableType::class, ['repetities' => $repetities]);
+		$table = $this->createDataTableWithType(BeheerMaaltijdenTableType::class, [BeheerMaaltijdenTableType::OPTION_REPETITIES => $repetities]);
 
 		return view('maaltijden.pagina', [
 			'titel' => 'Maaltijdenbeheer',

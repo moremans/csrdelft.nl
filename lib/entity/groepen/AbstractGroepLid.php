@@ -9,8 +9,6 @@ use CsrDelft\model\entity\groepen\GroepKeuzeSelectie;
 use CsrDelft\repository\ProfielRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation as Serializer;
-
 
 /**
  * AbstractGroepLid.php
@@ -32,7 +30,6 @@ abstract class AbstractGroepLid implements DataTableEntry {
 	 * @var int
 	 * @ORM\Column(type="integer")
 	 * @ORM\Id()
-	 * @Serializer\Groups("datatable")
 	 */
 	public $groep_id;
 	/**
@@ -42,7 +39,6 @@ abstract class AbstractGroepLid implements DataTableEntry {
 	 * @var string
 	 * @ORM\Column(type="uid")
 	 * @ORM\Id()
-	 * @Serializer\Groups("datatable")
 	 */
 	public $uid;
 	/**
@@ -55,20 +51,17 @@ abstract class AbstractGroepLid implements DataTableEntry {
 	 * CommissieFunctie of opmerking bij lidmaatschap
 	 * @var CommissieFunctie
 	 * @ORM\Column(type="string", nullable=true)
-	 * @Serializer\Groups("datatable")
 	 */
 	public $opmerking;
 	/**
 	 * @var GroepKeuzeSelectie[]
 	 * @ORM\Column(type="groepkeuzeselectie", nullable=true)
-	 * @Serializer\Groups("datatable")
 	 */
 	public $opmerking2;
 	/**
 	 * Datum en tijd van aanmelden
 	 * @var DateTimeImmutable
 	 * @ORM\Column(type="datetime")
-	 * @Serializer\Groups("datatable")
 	 */
 	public $lid_sinds;
 	/**
@@ -80,19 +73,15 @@ abstract class AbstractGroepLid implements DataTableEntry {
 
 	/**
 	 * @return string|null
-	 * @Serializer\Groups("datatable")
-	 * @Serializer\SerializedName("lid")
 	 */
-	public function getDatatableLid() {
+	public function getLid() {
 		return ProfielRepository::getLink($this->uid);
 	}
 
 	/**
 	 * @return string|null
-	 * @Serializer\Groups("datatable")
-	 * @Serializer\SerializedName("door_uid")
 	 */
-	public function getDatatableDoorUid() {
+	public function getDoorUid() {
 		return ProfielRepository::getLink($this->door_uid);
 	}
 

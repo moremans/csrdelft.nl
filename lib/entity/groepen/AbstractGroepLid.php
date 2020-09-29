@@ -39,11 +39,12 @@ abstract class AbstractGroepLid implements DataTableEntry {
 	 * @var string
 	 * @ORM\Column(type="uid")
 	 * @ORM\Id()
+	 * @Serializer\Groups("vue")
 	 */
 	public $uid;
 	/**
 	 * @var Profiel
-	 * @ORM\OneToOne(targetEntity="CsrDelft\entity\profiel\Profiel")
+	 * @ORM\ManyToOne(targetEntity="CsrDelft\entity\profiel\Profiel")
 	 * @ORM\JoinColumn(name="uid", referencedColumnName="uid")
 	 */
 	public $profiel;
@@ -56,6 +57,7 @@ abstract class AbstractGroepLid implements DataTableEntry {
 	/**
 	 * @var GroepKeuzeSelectie[]
 	 * @ORM\Column(type="groepkeuzeselectie", nullable=true)
+	 * @Serializer\Groups("vue")
 	 */
 	public $opmerking2;
 	/**
@@ -70,7 +72,12 @@ abstract class AbstractGroepLid implements DataTableEntry {
 	 * @ORM\Column(type="uid")
 	 */
 	public $door_uid;
-
+	/**
+	 * @var Profiel
+	 * @ORM\ManyToOne(targetEntity="CsrDelft\entity\profiel\Profiel")
+	 * @ORM\JoinColumn(name="door_uid", referencedColumnName="uid")
+	 */
+	public $door_profiel;
 	/**
 	 * @return string|null
 	 */
@@ -85,6 +92,10 @@ abstract class AbstractGroepLid implements DataTableEntry {
 		return ProfielRepository::getLink($this->door_uid);
 	}
 
+	/**
+	 * @return string|null
+	 * @Serializer\Groups("vue")
+	 */
 	public function getLink() {
 		return ProfielRepository::getLink($this->uid);
 	}

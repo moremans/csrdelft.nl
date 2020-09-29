@@ -134,7 +134,7 @@ class MaaltijdRepetitie implements DisplayEntity {
 		return $this->mlt_repetitie_id;
 	}
 
-	function getWeergave(): string {
-		return $this->standaard_titel;
+	public function getWeergave(): string {
+		return $this->standaard_titel ?? "";
 	}
 }

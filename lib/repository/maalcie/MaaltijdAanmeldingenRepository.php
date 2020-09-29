@@ -6,15 +6,18 @@ use CsrDelft\common\ContainerFacade;
 use CsrDelft\common\CsrGebruikerException;
 use CsrDelft\entity\fiscaat\CiviBestelling;
 use CsrDelft\entity\fiscaat\CiviBestellingInhoud;
+use CsrDelft\entity\fiscaat\CiviProduct;
 use CsrDelft\entity\maalcie\Maaltijd;
 use CsrDelft\entity\maalcie\MaaltijdAanmelding;
 use CsrDelft\entity\maalcie\MaaltijdRepetitie;
+use CsrDelft\entity\profiel\Profiel;
 use CsrDelft\repository\AbstractRepository;
 use CsrDelft\repository\fiscaat\CiviProductRepository;
 use CsrDelft\repository\fiscaat\CiviSaldoRepository;
 use CsrDelft\repository\ProfielRepository;
 use CsrDelft\repository\security\AccountRepository;
 use CsrDelft\service\AccessService;
+use DateTime;
 use DateTimeInterface;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
@@ -31,14 +34,25 @@ use Doctrine\Persistence\ManagerRegistry;
  * @method MaaltijdAanmelding[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
  */
 class MaaltijdAanmeldingenRepository extends AbstractRepository {
-	public function __construct(ManagerRegistry $registry) {
+	/**
+	 * @var CiviSaldoRepository
+	 */
+	private $civiSaldoRepository;
+	/**
+	 * @var AccessService
+	 */
+	private $accessService;
+
+	public function __construct(ManagerRegistry $registry, CiviSaldoRepository $civiSaldoRepository, AccessService $accessService) {
 		parent::__construct($registry, MaaltijdAanmelding::class);
+		$this->civiSaldoRepository = $civiSaldoRepository;
+		$this->accessService = $accessService;
 	}
 
 	/**
 	 * @param Maaltijd $maaltijd
-	 * @param string $uid
-	 * @param string $doorUid
+	 * @param Profiel $profiel
+	 * @param Profiel $doorProfiel
 	 * @param int $aantalGasten
 	 * @param bool $beheer
 	 * @param string $gastenEetwens
@@ -48,8 +62,8 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 	 */
 	public function aanmeldenVoorMaaltijd(
 		Maaltijd $maaltijd,
-		$uid,
-		$doorUid,
+		Profiel $profiel,
+		Profiel $doorProfiel,
 		$aantalGasten = 0,
 		$beheer = false,
 		$gastenEetwens = ''
@@ -58,15 +72,15 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 			ContainerFacade::getContainer()->get(MaaltijdenRepository::class)->sluitMaaltijd($maaltijd);
 		}
 		if (!$beheer) {
-			$this->assertMagAanmelden($maaltijd, $uid);
+			$this->assertMagAanmelden($maaltijd, $profiel->uid);
 		}
 
-		if ($maaltijd->getIsAangemeld($uid)) {
+		if ($maaltijd->getIsAangemeld($profiel->uid)) {
 			if (!$beheer) {
 				throw new CsrGebruikerException('Al aangemeld');
 			}
 			// aanmelding van lid updaten met aantal gasten door beheerder
-			$aanmelding = $this->loadAanmelding($maaltijd->maaltijd_id, $uid);
+			$aanmelding = $this->loadAanmelding($maaltijd->maaltijd_id, $profiel->uid);
 			$verschil = $aantalGasten - $aanmelding->aantal_gasten;
 			$aanmelding->aantal_gasten = $aantalGasten;
 			$aanmelding->laatst_gewijzigd = date_create_immutable();
@@ -77,8 +91,10 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 			$aanmelding = new MaaltijdAanmelding();
 			$aanmelding->maaltijd = $maaltijd;
 			$aanmelding->maaltijd_id = $maaltijd->maaltijd_id;
-			$aanmelding->uid = $uid;
-			$aanmelding->door_uid = $doorUid;
+			$aanmelding->uid = $profiel->uid;
+			$aanmelding->profiel = $profiel;
+			$aanmelding->door_uid = $doorProfiel->uid;
+			$aanmelding->door_profiel = $profiel;
 			$aanmelding->aantal_gasten = $aantalGasten;
 			$aanmelding->gasten_eetwens = $gastenEetwens;
 			$aanmelding->laatst_gewijzigd = date_create_immutable();
@@ -97,7 +113,7 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 	 * @throws CsrGebruikerException
 	 */
 	protected function assertMagAanmelden(Maaltijd $maaltijd, $uid) {
-		if (ContainerFacade::getContainer()->get(CiviSaldoRepository::class)->getSaldo($uid) === false) {
+		if (!ContainerFacade::getContainer()->get(CiviSaldoRepository::class)->getSaldo($uid)) {
 			throw new CsrGebruikerException('Aanmelden voor maaltijden niet toegestaan, geen CiviSaldo.');
 		}
 		if (!$this->checkAanmeldFilter($uid, $maaltijd->aanmeld_filter)) {
@@ -125,7 +141,7 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 		if (empty($filter)) {
 			return true;
 		}
-		return AccessService::mag($account, $filter);
+		return $this->accessService->mag($account, $filter);
 	}
 
 	public function getIsAangemeld($mid, $uid) {
@@ -170,7 +186,7 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 		$aanmeldingen = $this->getAanmeldingenVoorLid($byMid, $uid);
 		$aantal = 0;
 		foreach ($aanmeldingen as $mid => $aanmelding) {
-			if ($repetitie->mlt_repetitie_id === $aanmelding->door_abonnement) {
+			if ($aanmelding->abonnementRepetitie && $repetitie->mlt_repetitie_id === $aanmelding->abonnementRepetitie->mlt_repetitie_id) {
 				$this->getEntityManager()->remove($aanmelding);
 				$aantal++;
 			}
@@ -207,14 +223,14 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 
 	/**
 	 * @param Maaltijd $maaltijd
-	 * @param string $uid
+	 * @param Profiel $profiel
 	 * @param bool $beheer
 	 * @return Maaltijd
 	 * @throws ORMException
 	 * @throws OptimisticLockException
 	 */
-	public function afmeldenDoorLid(Maaltijd $maaltijd, $uid, $beheer = false) {
-		if (!$this->getIsAangemeld($maaltijd->maaltijd_id, $uid)) {
+	public function afmeldenDoorLid(Maaltijd $maaltijd, Profiel $profiel, $beheer = false) {
+		if (!$this->getIsAangemeld($maaltijd->maaltijd_id, $profiel->uid)) {
 			throw new CsrGebruikerException('Niet aangemeld');
 		}
 		if (!$maaltijd->gesloten && $maaltijd->getBeginMoment() < time()) {
@@ -223,7 +239,7 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 		if (!$beheer && $maaltijd->gesloten) {
 			throw new CsrGebruikerException('Maaltijd is gesloten');
 		}
-		$aanmelding = $this->loadAanmelding($maaltijd->maaltijd_id, $uid);
+		$aanmelding = $this->loadAanmelding($maaltijd->maaltijd_id, $profiel->uid);
 		$this->_em->remove($aanmelding);
 		$this->_em->flush();
 		$maaltijd->aantal_aanmeldingen = $maaltijd->getAantalAanmeldingen() - 1 - $aanmelding->aantal_gasten;
@@ -309,11 +325,12 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 		$lijst = array();
 		foreach ($aanmeldingen as $aanmelding) {
 			$aanmelding->maaltijd = $maaltijd;
-			$naam = ProfielRepository::getNaam($aanmelding->uid, 'streeplijst');
+			$naam = $aanmelding->profiel->getNaam('streeplijst');
 			$lijst[$naam] = $aanmelding;
 			for ($i = $aanmelding->aantal_gasten; $i > 0; $i--) {
 				$gast = new MaaltijdAanmelding();
-				$gast->door_uid = ($aanmelding->uid);
+				$gast->door_uid = $aanmelding->profiel->uid;
+				$gast->door_profiel = $aanmelding->profiel;
 				$lijst[$naam . 'gast' . $i] = $gast;
 			}
 		}
@@ -380,16 +397,20 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 		$bestelling = new CiviBestelling();
 		$bestelling->cie = 'maalcie';
 		$bestelling->uid = $aanmelding->uid;
+		$bestelling->civiSaldo = $this->civiSaldoRepository->find($aanmelding->uid);
 		$bestelling->deleted = false;
-		$bestelling->moment = getDateTime();
+		$bestelling->moment = new DateTime();
 		$bestelling->comment = sprintf('Datum maaltijd: %s', date('Y-M-d', $aanmelding->maaltijd->getBeginMoment()));
 
 		$inhoud = new CiviBestellingInhoud();
 		$inhoud->aantal = 1 + $aanmelding->aantal_gasten;
 		$inhoud->product_id = $aanmelding->maaltijd->product_id;
+		/** @var CiviProduct $product */
+		$product = ContainerFacade::getContainer()->get(CiviProductRepository::class)->getProduct($inhoud->product_id);
+		$inhoud->product = $product;
 
 		$bestelling->inhoud[] = $inhoud;
-		$bestelling->totaal = ContainerFacade::getContainer()->get(CiviProductRepository::class)->getProduct($inhoud->product_id)->prijs * (1 + $aanmelding->aantal_gasten);
+		$bestelling->totaal = $product->getPrijsInt() * (1 + $aanmelding->aantal_gasten);
 
 		return $bestelling;
 	}
@@ -445,12 +466,15 @@ class MaaltijdAanmeldingenRepository extends AbstractRepository {
 			try {
 				$this->assertMagAanmelden($maaltijd, $uid);
 
+				$profiel = ProfielRepository::get($uid);
 				$aanmelding = new MaaltijdAanmelding();
 				$aanmelding->maaltijd = $maaltijd;
 				$aanmelding->maaltijd_id = $maaltijd->maaltijd_id;
 				$aanmelding->uid = $uid;
+				$aanmelding->profiel = $profiel;
 				$aanmelding->door_uid = $uid;
-				$aanmelding->door_abonnement = $repetitie->mlt_repetitie_id;
+				$aanmelding->door_profiel = $profiel;
+				$aanmelding->abonnementRepetitie = $repetitie;
 				$aanmelding->laatst_gewijzigd = date_create_immutable();
 				$aanmelding->gasten_eetwens = '';
 

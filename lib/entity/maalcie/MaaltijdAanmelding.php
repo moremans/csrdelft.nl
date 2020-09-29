@@ -3,7 +3,7 @@
 namespace CsrDelft\entity\maalcie;
 
 use CsrDelft\common\CsrException;
-use CsrDelft\repository\ProfielRepository;
+use CsrDelft\entity\profiel\Profiel;
 use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -45,23 +45,24 @@ class MaaltijdAanmelding {
 	 */
 	public $uid;
 	/**
+	 * @var Profiel
+	 * @ORM\ManyToOne(targetEntity="CsrDelft\entity\profiel\Profiel")
+	 * @ORM\JoinColumn(name="uid", referencedColumnName="uid")
+	 */
+	public $profiel;
+	/**
 	 * @var int
 	 * @ORM\Column(type="integer")
 	 */
 	public $aantal_gasten = 0;
 	/**
-	 * @var string
+	 * @var string|null
 	 * @ORM\Column(type="string", nullable=true)
 	 */
 	public $gasten_eetwens;
 	/**
-	 * @var integer
-	 * @ORM\Column(type="integer", nullable=true)
-	 */
-	public $door_abonnement;
-	/**
-	 * @var string
-	 * @ORM\Column(type="uid")
+	 * @var string|null
+	 * @ORM\Column(type="uid", nullable=true)
 	 */
 	public $door_uid;
 	/**
@@ -75,6 +76,18 @@ class MaaltijdAanmelding {
 	 * @ORM\JoinColumn(name="maaltijd_id", referencedColumnName="maaltijd_id")
 	 */
 	public $maaltijd;
+	/**
+	 * @var Profiel
+	 * @ORM\ManyToOne(targetEntity="CsrDelft\entity\profiel\Profiel")
+	 * @ORM\JoinColumn(name="door_uid", referencedColumnName="uid")
+	 */
+	public $door_profiel;
+	/**
+	 * @var MaaltijdRepetitie
+	 * @ORM\ManyToOne(targetEntity="CsrDelft\entity\maalcie\MaaltijdRepetitie")
+	 * @ORM\JoinColumn(name="door_abonnement", referencedColumnName="mlt_repetitie_id")
+	 */
+	public $abonnementRepetitie;
 
 	/**
 	 * Haal het MaalCie saldo op van het lid van deze aanmelding.
@@ -82,7 +95,7 @@ class MaaltijdAanmelding {
 	 * @return float if lid exists, false otherwise
 	 */
 	public function getSaldo() {
-		return ProfielRepository::get($this->uid)->getCiviSaldo();
+		return $this->profiel->getCiviSaldo();
 	}
 
 	/**

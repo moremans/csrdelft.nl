@@ -9,6 +9,7 @@ use CsrDelft\repository\corvee\CorveeTakenRepository;
 use CsrDelft\repository\maalcie\MaaltijdAanmeldingenRepository;
 use CsrDelft\repository\ProfielRepository;
 use DateInterval;
+use Twig\Environment;
 
 /**
  * CorveeHerinneringenModel.class.php
@@ -30,37 +31,39 @@ class CorveeHerinneringService {
 	 * @var ProfielRepository
 	 */
 	private $profielRepository;
+	/**
+	 * @var Environment
+	 */
+	private $twig;
 
-	public function __construct(MaaltijdAanmeldingenRepository $maaltijdAanmeldingenRepository, CorveeTakenRepository $corveeTakenRepository, ProfielRepository $profielRepository) {
+	public function __construct(Environment $twig, MaaltijdAanmeldingenRepository $maaltijdAanmeldingenRepository, CorveeTakenRepository $corveeTakenRepository, ProfielRepository $profielRepository) {
 		$this->maaltijdAanmeldingenRepository = $maaltijdAanmeldingenRepository;
 		$this->corveeTakenRepository = $corveeTakenRepository;
 		$this->profielRepository = $profielRepository;
+		$this->twig = $twig;
 	}
 
 	public function stuurHerinnering(CorveeTaak $taak) {
 		$datum = date_format_intl($taak->datum, DATE_FORMAT);
-		$uid = $taak->uid;
-		$profiel = $this->profielRepository->find($uid);
-		if (!$profiel) {
-			throw new CsrGebruikerException($datum . ' ' . $taak->corveeFunctie->naam . ' niet toegewezen!' . (!empty($uid) ? ' ($uid =' . $uid . ')' : ''));
+		if (!$taak->profiel) {
+			throw new CsrGebruikerException($datum . ' ' . $taak->corveeFunctie->naam . ' niet toegewezen!');
 		}
-		$lidnaam = $profiel->getNaam('civitas');
-		$to = array($profiel->getPrimaryEmail() => $lidnaam);
-		$from = 'corvee@csrdelft.nl';
+		$lidnaam = $taak->profiel->getNaam('civitas');
+		$to = $taak->profiel->getEmailOntvanger();
+		$from = $_ENV['EMAIL_CC'];
 		$onderwerp = 'C.S.R. Delft corvee ' . $datum;
-		$bericht = $taak->corveeFunctie->email_bericht;
 		$eten = '';
-		if ($taak->maaltijd_id !== null) {
-			$aangemeld = $this->maaltijdAanmeldingenRepository->getIsAangemeld($taak->maaltijd_id, $uid);
+		if ($taak->maaltijd !== null) {
+			$aangemeld = $this->maaltijdAanmeldingenRepository->getIsAangemeld($taak->maaltijd->maaltijd_id, $taak->profiel->uid);
 			if ($aangemeld) {
 				$eten = instelling('corvee', 'mail_wel_meeeten');
 			} else {
 				$eten = instelling('corvee', 'mail_niet_meeeten');
 			}
 		}
+		$bericht = str_replace(['LIDNAAM', 'DATUM', 'MEEETEN'], [$lidnaam, $datum, $eten], $taak->corveeFunctie->email_bericht);
 		$mail = new Mail($to, $onderwerp, $bericht);
 		$mail->setFrom($from);
-		$mail->setPlaceholders(array('LIDNAAM' => $lidnaam, 'DATUM' => $datum, 'MEEETEN' => $eten));
 		if ($mail->send()) { // false if failed
 			if (!$mail->inDebugMode()) {
 				$this->corveeTakenRepository->updateGemaild($taak);

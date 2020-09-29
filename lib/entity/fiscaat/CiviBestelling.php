@@ -16,7 +16,6 @@ use Symfony\Component\Serializer\Annotation as Serializer;
  * @author G.J.W. Oolbekkink <g.j.w.oolbekkink@gmail.com>
  *
  * @ORM\Entity(repositoryClass="CsrDelft\repository\fiscaat\CiviBestellingRepository")
- * @ORM\Table("CiviBestelling")
  */
 class CiviBestelling {
 	/**
@@ -35,19 +34,19 @@ class CiviBestelling {
 	public $uid;
 	/**
 	 * @var int
-	 * @ORM\Column(type="integer")
+	 * @ORM\Column(type="integer", options={"default"=0})
 	 * @Serializer\Groups("datatable")
 	 */
 	public $totaal = 0;
 	/**
 	 * @var boolean
-	 * @ORM\Column(type="boolean")
+	 * @ORM\Column(type="boolean", options={"default"=false})
 	 * @Serializer\Groups("datatable")
 	 */
 	public $deleted;
 	/**
 	 * @var \DateTimeImmutable
-	 * @ORM\Column(type="datetime")
+	 * @ORM\Column(type="datetime", options={"default"="CURRENT_TIMESTAMP"})
 	 * @Serializer\Groups("datatable")
 	 */
 	public $moment;
@@ -69,6 +68,13 @@ class CiviBestelling {
 	 * @ORM\OneToMany(targetEntity="CiviBestellingInhoud", mappedBy="bestelling")
 	 */
 	public $inhoud;
+
+	/**
+	 * @var CiviSaldo
+	 * @ORM\ManyToOne(targetEntity="CiviSaldo")
+	 * @ORM\JoinColumn(name="uid", referencedColumnName="uid")
+	 */
+	public $civiSaldo;
 
 	public function __construct() {
 		$this->inhoud = new ArrayCollection();
@@ -93,16 +99,21 @@ class CiviBestelling {
 	public function getPinBeschrijving() {
 		$pinProduct = $this->getProduct(CiviProductTypeEnum::PINTRANSACTIE);
 
-		if ($pinProduct === false) {
-			return "";
+		if ($pinProduct === null) {
+			$pinCorrectieProduct = $this->getProduct(CiviProductTypeEnum::PINCORRECTIE);
+			if ($pinCorrectieProduct) {
+				return format_bedrag($pinCorrectieProduct->aantal) . ' pincorrectie';
+			} else {
+				return "";
+			}
 		}
 
-		$beschrijving = sprintf('€%.2f PIN', $pinProduct->aantal / 100);
+		$beschrijving = format_bedrag($pinProduct->aantal) . ' PIN';
 
 		$aantalInhoud = count($this->inhoud);
 
 		if ($aantalInhoud == 2) {
-			$beschrijving .= sprintf(' en 1 ander product');
+			$beschrijving .= ' en 1 ander product';
 		} elseif ($aantalInhoud > 2) {
 			$beschrijving .= sprintf(' en %d andere producten', $aantalInhoud - 1);
 		}

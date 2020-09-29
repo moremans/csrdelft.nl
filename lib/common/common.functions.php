@@ -18,8 +18,8 @@ use CsrDelft\view\formulier\CsrfField;
 use CsrDelft\view\Icon;
 
 define('LONG_DATE_FORMAT', 'EE d MMM'); // Ma 3 Jan
-define('DATE_FORMAT', 'Y-MM-dd');
-define('DATETIME_FORMAT', 'Y-MM-dd HH:mm:ss');
+define('DATE_FORMAT', 'y-MM-dd');
+define('DATETIME_FORMAT', 'y-MM-dd HH:mm:ss');
 define('TIME_FORMAT', 'HH:mm');
 
 /**
@@ -84,7 +84,15 @@ function group_by($prop, $in, $del = true) {
 	$del &= is_array($in);
 	$out = array();
 	foreach ($in as $i => $obj) {
-		$out[$obj->$prop][] = $obj; // add to array
+		if (property_exists($obj, $prop)) {
+			$key = $obj->$prop;
+		} elseif (method_exists($obj, $prop)) {
+			$key = $obj->$prop();
+		} else {
+			throw new Exception("Veld bestaat niet");
+		}
+
+		$out[$key][] = $obj; // add to array
 		if ($del) {
 			unset($in[$i]);
 		}
@@ -147,25 +155,22 @@ function getSessionMaxLifeTime() {
  * @param boolean $refresh allow a refresh; redirect to CSR_ROOT otherwise
  */
 function redirect($url = null, $refresh = true) {
+	$request = ContainerFacade::getContainer()->get('request_stack')->getCurrentRequest();
 	if (empty($url) || $url === null) {
-		$url = REQUEST_URI;
+		$url = $request->getRequestUri();
 	}
-	if (!$refresh && $url == REQUEST_URI) {
-		$url = CSR_ROOT;
+	if (!$refresh && $url == $request->getRequestUri()) {
+		$url = $_ENV['CSR_ROOT'];
 	}
-	if (!startsWith($url, CSR_ROOT)) {
+	if (!startsWith($url, $_ENV['CSR_ROOT'])) {
 		if (preg_match("/^[?#\/]/", $url) === 1) {
-			$url = CSR_ROOT . $url;
+			$url = $_ENV['CSR_ROOT'] . $url;
 		} else {
-			$url = CSR_ROOT;
+			$url = $_ENV['CSR_ROOT'];
 		}
 	}
 	header('location: ' . $url);
 	exit;
-}
-
-function redirect_via_login($url) {
-	redirect(CSR_ROOT . "/login?redirect=" . urlencode($url));
 }
 
 /**
@@ -253,6 +258,19 @@ function valid_filename($name) {
 }
 
 /**
+ * Remove unsafe characters from filename
+ * @param $name string
+ *
+ * @return bool
+ */
+function filter_filename($name) {
+	//Remove dots in front of filename to prevent directory traversal
+	$name = ltrim($name, ".");
+
+	return preg_replace('/[^a-z0-9 \-_()éê\.]/', ' ', $name);
+}
+
+/**
  * @source http://www.regular-expressions.info/email.html
  * @param $email
  *
@@ -282,7 +300,7 @@ function external_url($url, $label) {
 	$url = filter_var($url, FILTER_SANITIZE_URL);
 	if ($url && (url_like($url) || url_like(CSR_ROOT . $url))) {
 		if (startsWith($url, 'http://') || startsWith($url, 'https://')) {
-			$extern = 'target="_blank"';
+			$extern = 'target="_blank" rel="noopener"';
 		} else {
 			$extern = '';
 		}
@@ -299,6 +317,14 @@ function external_url($url, $label) {
  */
 function isSyrinx() {
 	return 'syrinx' === php_uname('n');
+}
+
+function isCli() {
+	return php_sapi_name() == 'cli' && $_SERVER['APP_ENV'] != 'test';
+}
+
+function isCi() {
+	return getenv('CI');
 }
 
 /**
@@ -355,6 +381,17 @@ function isGeldigeDatum($datum) {
 }
 
 /**
+ * @param string $date
+ * @param string $format
+ * @return true als huidige datum & tijd voorbij gegeven datum en tijd zijn
+ */
+function isDatumVoorbij(string $date, $format = 'Y-m-d H:i:s') {
+	$date = date_create_immutable_from_format($format, $date);
+	$now = date_create_immutable();
+	return $now >= $date;
+}
+
+/**
  * print_r een variabele met <pre>-tags eromheen.
  *
  * @param mixed $sString
@@ -364,23 +401,6 @@ function debugprint($sString, $cssID = 'pubcie_debug') {
 	if (DEBUG || LoginService::mag(P_ADMIN) || ContainerFacade::getContainer()->get(SuService::class)->isSued()) {
 		echo '<pre class="' . $cssID . '">' . print_r($sString, true) . '</pre>';
 	}
-}
-
-function reldate($datum) {
-	if ($datum instanceof DateTimeInterface) {
-		$moment = $datum->getTimestamp();
-	} else {
-		$moment = strtotime($datum);
-	}
-
-	if (date('Y-m-d') == date('Y-m-d', $moment)) {
-		$return = 'vandaag om ' . strftime('%H:%M', $moment);
-	} elseif (date('Y-m-d', $moment) == date('Y-m-d', strtotime('1 day ago'))) {
-		$return = 'gisteren om ' . strftime('%H:%M', $moment);
-	} else {
-		$return = strftime('%A %e %B %Y om %H:%M', $moment); // php-bug: %e does not work on Windows
-	}
-	return '<time class="timeago" datetime="' . date('Y-m-d\TG:i:sO', $moment) . '">' . $return . '</time>'; // ISO8601
 }
 
 /**
@@ -537,39 +557,6 @@ function convertPHPSizeToBytes($sSize) {
 
 function getMaximumFileUploadSize() {
 	return min(convertPHPSizeToBytes(ini_get('post_max_size')), convertPHPSizeToBytes(ini_get('upload_max_filesize')));
-}
-
-function printDebug() {
-	$enableDebug = filter_input(INPUT_GET, 'debug') !== null;
-	if ($enableDebug && (DEBUG || (LoginService::mag(P_ADMIN) || ContainerFacade::getContainer()->get(SuService::class)->isSued()))) {
-		echo '<a id="mysql_debug_toggle" onclick="$(this).replaceWith($(\'#mysql_debug\').toggle());">DEBUG</a>';
-		echo '<div id="mysql_debug" class="pre">' . getDebug() . '</div>';
-	}
-}
-
-function getDebug(
-	$get = true, $post = true, $files = true, $cookie = true, $session = true, $server = true
-) {
-	$debug = '';
-	if ($get) {
-		$debug .= '<hr />GET<hr />' . htmlspecialchars(print_r($_GET, true));
-	}
-	if ($post) {
-		$debug .= '<hr />POST<hr />' . htmlspecialchars(print_r($_POST, true));
-	}
-	if ($files) {
-		$debug .= '<hr />FILES<hr />' . htmlspecialchars(print_r($_FILES, true));
-	}
-	if ($cookie) {
-		$debug .= '<hr />COOKIE<hr />' . htmlspecialchars(print_r($_COOKIE, true));
-	}
-	if ($session) {
-		$debug .= '<hr />SESSION<hr />' . htmlspecialchars(print_r($_SESSION, true));
-	}
-	if ($server) {
-		$debug .= '<hr />SERVER<hr />' . htmlspecialchars(print_r($_SERVER, true));
-	}
-	return $debug;
 }
 
 /**
@@ -803,7 +790,13 @@ function curl_request($url, $options = []) {
 	$curl = curl_init($url);
 	curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 	curl_setopt_array($curl, $options);
-	return curl_exec($curl);
+	$resp = curl_exec($curl);
+
+	if ($resp == false) {
+		throw new Exception(curl_error($curl));
+	}
+
+	return $resp;
 }
 
 /**
@@ -863,85 +856,97 @@ function checkMimetype($filename, $mime) {
 	$extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
 	$mimeToExtension = [
-		'application/x-7z-compressed' => '7z',
-		'audio/x-aac' => 'aac',
-		'application/postscript' => ['ai', 'eps', 'ps'],
-		'audio/x-aiff' => 'aif',
-		'text/plain' => ['asc', 'ini', 'log', 'txt'],
-		'video/x-ms-asf' => 'asf',
 		'application/atom+xml' => 'atom',
-		'video/x-msvideo' => 'avi',
-		'image/bmp' => 'bmp',
-		'application/x-bzip2' => 'bz2',
+		'application/cu-seeme' => 'cu',
+		'application/epub+zip' => 'epub',
+		'application/force-download' => 'mp3',
+		'application/gzip' => 'gz',
+		'application/java-archive' => 'jar',
+		'application/json' => 'json',
+		'application/msword' => 'doc',
+		'application/octet-stream' => 'rar', '.kdbx',
+		'application/ogg' => 'ogx',
+		'application/pdf' => 'pdf',
 		'application/pkix-cert' => 'cer',
 		'application/pkix-crl' => 'crl',
-		'application/x-x509-ca-cert' => 'crt',
-		'text/css' => 'css',
-		'text/csv' => 'csv',
-		'application/cu-seeme' => 'cu',
-		'application/x-debian-package' => 'deb',
-		'application/msword' => 'doc',
-		'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-		'application/x-dvi' => 'dvi',
-		'application/vnd.ms-fontobject' => 'eot',
-		'application/epub+zip' => 'epub',
-		'text/x-setext' => 'etx',
-		'audio/flac' => 'flac',
-		'video/x-flv' => 'flv',
-		'image/gif' => 'gif',
-		'application/gzip' => 'gz',
-		'text/html' => ['htm', 'html'],
-		'image/x-icon' => 'ico',
-		'text/calendar' => 'ics',
-		'application/x-iso9660-image' => 'iso',
-		'application/java-archive' => 'jar',
-		'image/jpeg' => ['jpe', 'jpeg', 'jpg'],
-		'text/javascript' => 'js',
-		'application/json' => 'json',
-		'application/x-latex' => 'latex',
-		'audio/mp4' => 'm4a',
-		'video/mp4' => ['m4v', 'mp4', 'mp4a', 'mp4v', 'mpg4'],
-		'audio/midi' => ['mid', 'midi'],
-		'video/quicktime' => ['mov', 'qt'],
-		'audio/mpeg' => 'mp3',
-		'audio/mp3' => 'mp3',
-		'video/mpeg' => ['mpe', 'mpeg', 'mpg'],
-		'audio/ogg' => ['oga', 'ogg', 'ogv'],
-		'application/ogg' => 'ogx',
-		'image/x-portable-bitmap' => 'pbm',
-		'application/pdf' => 'pdf',
-		'image/x-portable-graymap' => 'pgm',
-		'image/png' => 'png',
-		'image/x-portable-anymap' => 'pnm',
-		'image/x-portable-pixmap' => 'ppm',
-		'application/vnd.ms-powerpoint' => 'ppt',
-		'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
-		'application/x-rar-compressed' => 'rar',
-		'image/x-cmu-raster' => 'ras',
+		'application/postscript' => ['ai', 'eps', 'ps'],
+		'application/rar' => 'rar',
+		'application/rar-x' => 'rar',
 		'application/rss+xml' => 'rss',
 		'application/rtf' => 'rtf',
-		'text/sgml' => ['sgm', 'sgml'],
-		'image/svg+xml' => 'svg',
+		'application/vnd.ms-excel' => 'xls',
+		'application/vnd.ms-fontobject' => 'eot',
+		'application/vnd.ms-powerpoint' => 'ppt',
+		'application/vnd.openxmlformats-officedocument.pres' => 'pptx',
+		'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+		'application/vnd.openxmlformats-officedocument.spre' => 'xlsx',
+		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+		'application/vnd.openxmlformats-officedocument.word' => 'docx',
+		'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+		'application/wsdl+xml' => 'wsdl',
+		'application/x-7z-compressed' => '7z',
+		'application/x-bittorrent' => 'torrent',
+		'application/x-bzip2' => 'bz2',
+		'application/x-debian-package' => 'deb',
+		'application/x-dvi' => 'dvi',
+		'application/x-font-ttf' => 'ttf',
+		'application/x-font-woff' => 'woff',
+		'application/x-iso9660-image' => 'iso',
+		'application/x-latex' => 'latex',
+		'application/x-pdf' => 'pdf',
+		'application/x-rar' => 'rar',
+		'application/x-rar-compressed' => 'rar',
 		'application/x-shockwave-flash' => 'swf',
 		'application/x-tar' => 'tar',
-		'image/tiff' => ['tif', 'tiff'],
-		'application/x-bittorrent' => 'torrent',
-		'application/x-font-ttf' => 'ttf',
-		'audio/x-wav' => 'wav',
-		'video/webm' => 'webm',
-		'audio/x-ms-wma' => 'wma',
-		'video/x-ms-wmv' => 'wmv',
-		'application/x-font-woff' => 'woff',
-		'application/wsdl+xml' => 'wsdl',
-		'image/x-xbitmap' => 'xbm',
-		'application/vnd.ms-excel' => 'xls',
-		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+		'application/x-x509-ca-cert' => 'crt',
+		'application/x-zip-compressed' => 'zip',
 		'application/xml' => 'xml',
+		'application/zip' => 'zip',
+		'audio/flac' => 'flac',
+		'audio/midi' => ['mid', 'midi'],
+		'audio/mp3' => 'mp3',
+		'audio/mp4' => 'm4a',
+		'audio/mpeg' => 'mp3',
+		'audio/ogg' => ['oga', 'ogg', 'ogv'],
+		'audio/x-aac' => 'aac',
+		'audio/x-aiff' => 'aif',
+		'audio/x-ms-wma' => 'wma',
+		'audio/x-wav' => 'wav',
+		'image/bmp' => 'bmp',
+		'image/gif' => 'gif',
+		'image/jpeg' => ['jpe', 'jpeg', 'jpg'],
+		'image/png' => 'png',
+		'image/svg+xml' => 'svg',
+		'image/tiff' => ['tif', 'tiff'],
+		'image/x-cmu-raster' => 'ras',
+		'image/x-icon' => 'ico',
+		'image/x-portable-anymap' => 'pnm',
+		'image/x-portable-bitmap' => 'pbm',
+		'image/x-portable-graymap' => 'pgm',
+		'image/x-portable-pixmap' => 'ppm',
+		'image/x-wmf' => 'wmf',
+		'image/x-xbitmap' => 'xbm',
 		'image/x-xpixmap' => 'xpm',
 		'image/x-xwindowdump' => 'xwd',
+		'text/calendar' => 'ics',
+		'text/css' => 'css',
+		'text/csv' => 'csv',
+		'text/html' => ['htm', 'html'],
+		'text/javascript' => 'js',
+		'text/pdf' => 'pdf',
+		'text/plain' => ['asc', 'ini', 'log', 'txt'],
+		'text/rtf' => 'rtf',
+		'text/sgml' => ['sgm', 'sgml'],
+		'text/x-setext' => 'etx',
 		'text/yaml' => ['yaml', 'yml'],
-		'application/zip' => 'zip',
-		'application/x-zip-compressed' => 'zip',
+		'video/mp4' => ['m4v', 'mp4', 'mp4a', 'mp4v', 'mpg4'],
+		'video/mpeg' => ['mpe', 'mpeg', 'mpg'],
+		'video/quicktime' => ['mov', 'qt'],
+		'video/webm' => 'webm',
+		'video/x-flv' => 'flv',
+		'video/x-ms-asf' => 'asf',
+		'video/x-ms-wmv' => 'wmv',
+		'video/x-msvideo' => 'avi',
 	];
 
 	$expectedExtension = $mimeToExtension[$mime] ?? null;
@@ -959,8 +964,6 @@ function checkMimetype($filename, $mime) {
 
 /**
  * Mag de op dit moment ingelogde gebruiker $permissie?
- *
- * Korte methode voor gebruik in Blade templates.
  *
  * @param string $permission
  * @param array|null $allowedAuthenticationMethods
@@ -1180,4 +1183,40 @@ function as_array($value) {
  */
 function short_class($class) {
 	return (new \ReflectionClass($class))->getShortName();
+}
+
+// Base64url functies van https://www.php.net/manual/en/function.base64-encode.php#103849
+function base64url_encode($data) {
+  return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function base64url_decode($data) {
+  return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
+}
+
+/**
+ * Maak een ReflectionMethod voor een callable.
+ *
+ * @param callable $fn
+ * @return ReflectionMethod
+ * @throws ReflectionException
+ */
+function createReflectionMethod(callable $fn) {
+	if (is_callable($fn)) {
+		if (is_array($fn)) {
+			if (is_object($fn[0])) {
+				return new ReflectionMethod(\get_class($fn[0]), $fn[1]);
+			} elseif (is_string($fn[0])) {
+				return new ReflectionMethod($fn[0], $fn[1]);
+			}
+		} elseif (is_string($fn)) {
+			if (strpos($fn, '::') !== false) {
+				return new ReflectionMethod($fn);
+			}
+		} elseif (is_object($fn)) {
+			return new ReflectionMethod(\get_class($fn), '__invoke');
+		}
+	}
+
+	throw new InvalidArgumentException('Niet een callable');
 }

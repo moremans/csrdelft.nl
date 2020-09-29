@@ -42,10 +42,15 @@ class CiviSaldoRepository extends AbstractRepository {
 	/**
 	 * @param string $uid
 	 *
+	 * @param bool $alleenActief
 	 * @return CiviSaldo|null
 	 */
-	public function getSaldo($uid) {
-		return $this->findOneBy(['uid' => $uid]);
+	public function getSaldo($uid, $alleenActief = false) {
+		$critera = ['uid' => $uid];
+		if ($alleenActief) {
+			$critera['deleted'] = 0;
+		}
+		return $this->findOneBy($critera);
 	}
 
 	/**
@@ -54,7 +59,7 @@ class CiviSaldoRepository extends AbstractRepository {
 	 * @return CiviSaldo
 	 */
 	public function maakSaldo($uid) {
-		$saldo = new Civisaldo();
+		$saldo = new CiviSaldo();
 		$saldo->uid = $uid;
 		$saldo->naam = '';
 		$saldo->saldo = 0;
@@ -168,7 +173,7 @@ class CiviSaldoRepository extends AbstractRepository {
 		$this->_em->persist($entity);
 		$this->_em->flush();
 
-		return $entity->id;
+		return $entity->uid;
 	}
 
 	public function findLaatsteCommissie() {
@@ -176,7 +181,7 @@ class CiviSaldoRepository extends AbstractRepository {
 			->where('s.uid LIKE \'c%\'')
 			->orderBy('s.uid', 'DESC')
 			->setMaxResults(1)
-			->getQuery()->getResult()->first();
+			->getQuery()->getResult()[0];
 	}
 
 	/**
@@ -206,6 +211,10 @@ class CiviSaldoRepository extends AbstractRepository {
 			->getQuery()->getResult();
 	}
 
+	/**
+	 * @param int $saldogrens
+	 * @return CiviSaldo[]
+	 */
 	public function getRoodstaandeLeden($saldogrens) {
 		return $this->createQueryBuilder('cs')
 			->where('cs.saldo < :saldogrens')

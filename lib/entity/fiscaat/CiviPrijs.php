@@ -13,7 +13,9 @@ use Doctrine\ORM\Mapping as ORM;
  *
  * @author G.J.W. Oolbekkink <g.j.w.oolbekkink@gmail.com>
  * @ORM\Entity(repositoryClass="CsrDelft\repository\fiscaat\CiviPrijsRepository")
- * @ORM\Table("CiviPrijs")
+ * @ORM\Table("civi_prijs", uniqueConstraints={
+ *   @ORM\UniqueConstraint(name="unique_van_product_id", columns={"van", "product_id"})
+ * })
  */
 class CiviPrijs {
 	/**
@@ -25,7 +27,7 @@ class CiviPrijs {
 	public $id;
 	/**
 	 * @var DateTimeImmutable
-	 * @ORM\Column(type="datetime")
+	 * @ORM\Column(type="datetime", options={"default"="CURRENT_TIMESTAMP"})
 	 */
 	public $van;
 	/**

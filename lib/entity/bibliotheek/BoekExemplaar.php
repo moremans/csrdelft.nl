@@ -24,12 +24,12 @@ class BoekExemplaar {
 	public $id;
 	/**
 	 * @var int
-	 * @ORM\Column(type="integer")
+	 * @ORM\Column(type="integer", options={"default"=0})
 	 */
 	public $boek_id;
 	/**
 	 * @var string
-	 * @ORM\Column(type="stringkey")
+	 * @ORM\Column(type="uid")
 	 */
 	public $eigenaar_uid;
 	/**
@@ -46,7 +46,7 @@ class BoekExemplaar {
 
 	/**
 	 * @var string
-	 * @ORM\Column(type="stringkey", nullable=true)
+	 * @ORM\Column(type="uid", nullable=true)
 	 */
 	public $uitgeleend_uid;
 	/**
@@ -66,13 +66,13 @@ class BoekExemplaar {
 	 */
 	public $status;
 	/**
-	 * @var DateTimeImmutable
-	 * @ORM\Column(type="datetime")
+	 * @var DateTimeImmutable|null
+	 * @ORM\Column(type="datetime", nullable=true)
 	 */
 	public $uitleendatum;
 	/**
 	 * @var int
-	 * @ORM\Column(type="integer")
+	 * @ORM\Column(type="integer", options={"default"=0})
 	 */
 	public $leningen;
 
@@ -97,13 +97,6 @@ class BoekExemplaar {
 
 	public function magBewerken() : bool {
 		return $this->isEigenaar();
-	}
-
-	/**
-	 * @return Boek
-	 */
-	public function getBoek() {
-		return $this->boek;
 	}
 
 	public function magBekijken() {

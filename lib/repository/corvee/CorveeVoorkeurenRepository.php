@@ -127,7 +127,7 @@ DQL
 		if ($this->getHeeftVoorkeur($voorkeur->crv_repetitie_id, $voorkeur->uid)) {
 			throw new CsrGebruikerException('Voorkeur al ingeschakeld');
 		}
-		$repetitie = $this->corveeRepetitiesRepository->getRepetitie($voorkeur->crv_repetitie_id);
+		$repetitie = $voorkeur->corveeRepetitie;
 		if (!$repetitie->voorkeurbaar) {
 			throw new CsrGebruikerException('Niet voorkeurbaar');
 		}
@@ -176,7 +176,7 @@ DQL
 	 * @throws OptimisticLockException
 	 */
 	public function verwijderVoorkeuren($crid) {
-		$voorkeuren = $this->findBy(['crv_repetitie_id' => $crid]);
+		$voorkeuren = $this->findBy(['corveeRepetitie' => $crid]);
 		$num = count($voorkeuren);
 		foreach ($voorkeuren as $voorkeur) {
 			$this->_em->remove($voorkeur);

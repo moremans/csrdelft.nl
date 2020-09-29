@@ -8,9 +8,14 @@ use CsrDelft\entity\security\Account;
 use CsrDelft\entity\security\enum\AccessRole;
 use CsrDelft\repository\AbstractRepository;
 use CsrDelft\repository\fiscaat\CiviSaldoRepository;
+use CsrDelft\repository\MenuItemRepository;
 use CsrDelft\repository\ProfielRepository;
 use CsrDelft\service\AccessService;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Bridge\Doctrine\Security\User\UserLoaderInterface;
+use Symfony\Component\Security\Core\Encoder\EncoderFactoryInterface;
+use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
  * AccountRepository
@@ -23,8 +28,7 @@ use Doctrine\Persistence\ManagerRegistry;
  * @method Account[]    findAll()
  * @method Account[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
  */
-class AccountRepository extends AbstractRepository {
-
+class AccountRepository extends AbstractRepository implements PasswordUpgraderInterface, UserLoaderInterface {
 	/**
 	 * @var AccessService
 	 */
@@ -33,14 +37,28 @@ class AccountRepository extends AbstractRepository {
 	 * @var CiviSaldoRepository
 	 */
 	private $civiSaldoRepository;
+	/**
+	 * @var MenuItemRepository
+	 */
+	private $menuItemRepository;
+	/**
+	 * @var EncoderFactoryInterface
+	 */
+	private $encoderFactory;
 
-	public function __construct(ManagerRegistry $registry, AccessService $accessService, CiviSaldoRepository $civiSaldoRepository) {
+	public function __construct(
+		ManagerRegistry $registry,
+		EncoderFactoryInterface $encoderFactory,
+		AccessService $accessService,
+		CiviSaldoRepository $civiSaldoRepository,
+		MenuItemRepository $menuItemRepository
+	) {
 		parent::__construct($registry, Account::class);
 		$this->accessService = $accessService;
 		$this->civiSaldoRepository = $civiSaldoRepository;
+		$this->menuItemRepository = $menuItemRepository;
+		$this->encoderFactory = $encoderFactory;
 	}
-
-	const PASSWORD_HASH_ALGORITHM = PASSWORD_DEFAULT;
 
 	/**
 	 * @param $uid
@@ -57,7 +75,7 @@ class AccountRepository extends AbstractRepository {
 	 * @return bool
 	 */
 	public static function isValidUid($uid) {
-		return is_string($uid) AND preg_match('/^[a-z0-9]{4}$/', $uid);
+		return is_string($uid) && preg_match('/^[a-z0-9]{4}$/', $uid);
 	}
 
 	/**
@@ -67,22 +85,6 @@ class AccountRepository extends AbstractRepository {
 	 */
 	public static function existsUid($uid) {
 		return ContainerFacade::getContainer()->get(AccountRepository::class)->find($uid) != null;
-	}
-
-	/**
-	 * @param $email
-	 * @return Account|null
-	 */
-	public function findOneByEmail($email) {
-		if (empty($email)) {
-			return null;
-		}
-
-		return $this->findOneBy(['email' => $email]);
-	}
-
-	public function findOneByUsername($username) {
-		return $this->findOneBy(['username' => $username]);
 	}
 
 	/**
@@ -118,12 +120,22 @@ class AccountRepository extends AbstractRepository {
 			$this->civiSaldoRepository->maakSaldo($uid);
 		}
 
+		if (!$this->menuItemRepository->getMenuRoot($uid)) {
+			$menuItem = $this->menuItemRepository->nieuw(null);
+			$menuItem->rechten_bekijken = $uid;
+			$menuItem->tekst = $uid;
+			$menuItem->link = '';
+
+			$this->_em->persist($menuItem);
+		}
+
 		$account = new Account();
 		$account->uid = $uid;
+		$account->profiel = $profiel;
 		$account->username = $uid;
 		$account->email = $profiel->email;
 		$account->pass_hash = '';
-		$account->pass_since = date_create_immutable();
+		$account->pass_since = null;
 		$account->failed_login_attempts = 0;
 		$account->perm_role = $this->accessService->getDefaultPermissionRole($profiel->status);
 		$this->_em->persist($account);
@@ -140,37 +152,7 @@ class AccountRepository extends AbstractRepository {
 	 */
 	public function controleerWachtwoord(Account $account, $passPlain) {
 		// Controleer of het wachtwoord klopt
-		$hash = $account->pass_hash;
-		if (startsWith($hash, "{SSHA}")) {
-			$valid = $this->checkLegacyPasswordHash($passPlain, $hash);
-		} else {
-			$valid = password_verify($passPlain, $hash);
-		}
-
-		// Rehash wachtwoord als de hash niet aan de eisen voldoet
-		if ($valid && password_needs_rehash($hash, AccountRepository::PASSWORD_HASH_ALGORITHM)) {
-			$this->wijzigWachtwoord($account, $passPlain, false);
-		}
-
-		return $valid === true;
-	}
-
-	private function checkLegacyPasswordHash($passPlain, $hash) {
-		$ohash = base64_decode(substr($hash, 6));
-		$osalt = substr($ohash, 20);
-		$ohash = substr($ohash, 0, 20);
-		$nhash = pack("H*", sha1($passPlain . $osalt));
-		return hash_equals($ohash, $nhash);
-	}
-
-	/**
-	 * Create SSH hash.
-	 *
-	 * @param string $passPlain
-	 * @return string
-	 */
-	public function maakWachtwoord($passPlain) {
-		return password_hash($passPlain, AccountRepository::PASSWORD_HASH_ALGORITHM);
+		return $this->encoderFactory->getEncoder($account)->isPasswordValid($account->pass_hash, $passPlain, $account->getSalt());
 	}
 
 	/**
@@ -184,7 +166,7 @@ class AccountRepository extends AbstractRepository {
 	 */
 	public function wijzigWachtwoord(Account $account, $passPlain, bool $isVeranderd = true) {
 		if ($passPlain != '') {
-			$account->pass_hash = $this->maakWachtwoord($passPlain);
+			$account->pass_hash = $this->maakWachtwoord($account, $passPlain);
 			if ($isVeranderd) {
 				$account->pass_since = date_create_immutable();
 			}
@@ -200,7 +182,19 @@ class AccountRepository extends AbstractRepository {
 				ContainerFacade::getContainer()->get(ProfielRepository::class)->update($profiel);
 			}
 		}
+
 		return true;
+	}
+
+	/**
+	 * Create SSH hash.
+	 *
+	 * @param Account $account
+	 * @param string $passPlain
+	 * @return string
+	 */
+	public function maakWachtwoord(Account $account, $passPlain) {
+		return $this->encoderFactory->getEncoder($account)->encodePassword($passPlain, $account->getSalt());
 	}
 
 	/**
@@ -270,5 +264,34 @@ class AccountRepository extends AbstractRepository {
 	public function delete(Account $account) {
 		$this->_em->remove($account);
 		$this->_em->flush();
+	}
+
+	public function upgradePassword(UserInterface $user, string $newEncodedPassword): void {
+		$user->pass_hash = $newEncodedPassword;
+
+		$this->_em->flush();
+		$this->_em->clear();
+	}
+
+	public function loadUserByUsername(string $username) {
+		return $this->findOneByUsername($username);
+	}
+
+	public function findOneByUsername($username) {
+		return $this->find($username)
+			?? $this->findOneBy(['username' => $username])
+			?? $this->findOneByEmail($username);
+	}
+
+	/**
+	 * @param $email
+	 * @return Account|null
+	 */
+	public function findOneByEmail($email) {
+		if (empty($email)) {
+			return null;
+		}
+
+		return $this->findOneBy(['email' => $email]);
 	}
 }

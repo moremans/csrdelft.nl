@@ -8,6 +8,7 @@ use CsrDelft\repository\AbstractRepository;
 use CsrDelft\service\security\LoginService;
 use DateTime;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Security\Core\Security;
 
 /**
  * ForumDradenGelezenModel.class.php
@@ -21,15 +22,22 @@ use Doctrine\Persistence\ManagerRegistry;
  * @method ForumDraadGelezen[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
  */
 class ForumDradenGelezenRepository extends AbstractRepository {
-	public function __construct(ManagerRegistry $registry) {
+	/**
+	 * @var Security
+	 */
+	private $security;
+
+	public function __construct(ManagerRegistry $registry, Security $security) {
 		parent::__construct($registry, ForumDraadGelezen::class);
+		$this->security = $security;
 	}
 
 	protected function maakForumDraadGelezen(ForumDraad $draad) {
 		$gelezen = new ForumDraadGelezen();
 		$gelezen->draad = $draad;
 		$gelezen->draad_id = $draad->draad_id; // Set pk
-		$gelezen->uid = LoginService::getUid();
+		$gelezen->uid = $this->security->getUser()->getUsername();
+		$gelezen->profiel = $this->security->getUser()->profiel;
 		$gelezen->datum_tijd = date_create_immutable();
 		return $gelezen;
 	}
@@ -41,7 +49,7 @@ class ForumDradenGelezenRepository extends AbstractRepository {
 	 * @param DateTime $moment
 	 */
 	public function setWanneerGelezenDoorLid(ForumDraad $draad, $moment = null) {
-		$gelezen = $this->find(['draad_id' => $draad->draad_id, 'uid' => LoginService::getUid()]);
+		$gelezen = $this->find(['draad_id' => $draad->draad_id, 'uid' => $this->security->getUser()->getUsername()]);
 		if (!$gelezen) {
 			$gelezen = $this->maakForumDraadGelezen($draad);
 			$this->getEntityManager()->persist($gelezen);
@@ -61,20 +69,20 @@ class ForumDradenGelezenRepository extends AbstractRepository {
 		$this->getEntityManager()->clear();
 	}
 
-	public function verwijderDraadGelezen(ForumDraad $draad) {
-		$manager = $this->getEntityManager();
-		foreach ($this->findBy(['draad_id' => $draad->draad_id]) as $gelezen) {
-			$manager->remove($gelezen);
-		}
-		$manager->flush();
+	public function verwijderDraadGelezen(array $draadIds) {
+		$this->createQueryBuilder('fdg')
+			->delete()
+			->where('fdg.draad_id in (:draad_ids)')
+			->setParameter('draad_ids', $draadIds)
+			->getQuery()->execute();
 	}
 
-	public function verwijderDraadGelezenVoorLid($uid) {
-		$manager = $this->getEntityManager();
-		foreach ($this->findBy(['uid' => $uid]) as $gelezen) {
-			$manager->remove($gelezen);
-		}
-		$manager->flush();
+	public function verwijderDraadGelezenVoorLeden(array $uids) {
+		$this->createQueryBuilder('fdg')
+			->delete()
+			->where('fdg.uid in (:uids)')
+			->setParameter('uids', $uids)
+			->getQuery()->execute();
 	}
 
 }

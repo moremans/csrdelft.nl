@@ -3,6 +3,7 @@
 namespace CsrDelft\controller\maalcie;
 
 use CsrDelft\common\Annotation\Auth;
+use CsrDelft\controller\AbstractController;
 use CsrDelft\entity\corvee\CorveeRepetitie;
 use CsrDelft\entity\maalcie\MaaltijdRepetitie;
 use CsrDelft\repository\corvee\CorveeRepetitiesRepository;
@@ -10,17 +11,17 @@ use CsrDelft\repository\corvee\CorveeTakenRepository;
 use CsrDelft\repository\corvee\CorveeVoorkeurenRepository;
 use CsrDelft\repository\maalcie\MaaltijdRepetitiesRepository;
 use CsrDelft\view\maalcie\forms\CorveeRepetitieForm;
-use CsrDelft\view\renderer\TemplateView;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Throwable;
 
 /**
  * @author P.W.G. Brussee <brussee@live.nl>
  */
-class CorveeRepetitiesController {
+class CorveeRepetitiesController extends AbstractController {
 	private $repetitie = null;
 	/**
 	 * @var CorveeRepetitiesRepository
@@ -54,8 +55,8 @@ class CorveeRepetitiesController {
 	/**
 	 * @param CorveeRepetitie|null $corveeRepetitie
 	 * @param MaaltijdRepetitie|null $maaltijdRepetitie
-	 * @return TemplateView
-	 * @Route("/corvee/repetities/{crv_repetitie_id}/{mlt_repetitie_id}", methods={"GET"}, defaults={"crv_repetitie_id"=null,"mlt_repetitie_id"=null})
+	 * @return Response
+	 * @Route("/corvee/repetities/{crv_repetitie_id<\d*>}/{mlt_repetitie_id<\d*>}", methods={"GET"}, defaults={"crv_repetitie_id"=null,"mlt_repetitie_id"=null})
 	 * @Auth(P_CORVEE_MOD)
 	 */
 	public function beheer(CorveeRepetitie $corveeRepetitie = null, MaaltijdRepetitie $maaltijdRepetitie = null) {
@@ -68,7 +69,7 @@ class CorveeRepetitiesController {
 		} else {
 			$repetities = $this->corveeRepetitiesRepository->getAlleRepetities();
 		}
-		return view('maaltijden.corveerepetitie.beheer_corvee_repetities', [
+		return $this->render('maaltijden/corveerepetitie/beheer_corvee_repetities.html.twig', [
 			'repetities' => $repetities,
 			'maaltijdrepetitie' => $maaltijdRepetitie,
 			'modal' => $modal,
@@ -77,8 +78,8 @@ class CorveeRepetitiesController {
 
 	/**
 	 * @param MaaltijdRepetitie $maaltijdRepetitie
-	 * @return TemplateView
-	 * @Route("/corvee/repetities/maaltijd/{mlt_repetitie_id}", methods={"GET"})
+	 * @return Response
+	 * @Route("/corvee/repetities/maaltijd/{mlt_repetitie_id<\d+>}", methods={"GET"})
 	 * @Auth(P_CORVEE_MOD)
 	 */
 	public function maaltijd(MaaltijdRepetitie $maaltijdRepetitie) {
@@ -88,7 +89,7 @@ class CorveeRepetitiesController {
 	/**
 	 * @param MaaltijdRepetitie|null $repetitie
 	 * @return CorveeRepetitieForm
-	 * @Route("/corvee/repetities/nieuw/{mlt_repetitie_id}", methods={"POST"}, defaults={"mlt_repetitie_id"=null})
+	 * @Route("/corvee/repetities/nieuw/{mlt_repetitie_id<\d*>}", methods={"POST"}, defaults={"mlt_repetitie_id"=null})
 	 * @Auth(P_CORVEE_MOD)
 	 */
 	public function nieuw(MaaltijdRepetitie $repetitie = null) {
@@ -99,7 +100,7 @@ class CorveeRepetitiesController {
 	/**
 	 * @param CorveeRepetitie $corveeRepetitie
 	 * @return CorveeRepetitieForm
-	 * @Route("/corvee/repetities/bewerk/{crv_repetitie_id}", methods={"POST"})
+	 * @Route("/corvee/repetities/bewerk/{crv_repetitie_id<\d+>}", methods={"POST"})
 	 * @Auth(P_CORVEE_MOD)
 	 */
 	public function bewerk(CorveeRepetitie $corveeRepetitie) {
@@ -107,14 +108,14 @@ class CorveeRepetitiesController {
 	}
 
 	/**
-	 * @param CorveeRepetitie $corveeRepetitie
-	 * @return CorveeRepetitieForm|TemplateView
+	 * @param CorveeRepetitie|null $corveeRepetitie
+	 * @return CorveeRepetitieForm|Response
 	 * @throws ORMException
 	 * @throws OptimisticLockException
-	 * @Route("/corvee/repetities/opslaan/{crv_repetitie_id}", methods={"POST"}, defaults={"crv_repetitie_id"=null})
+	 * @Route("/corvee/repetities/opslaan/{crv_repetitie_id<\d*>}", methods={"POST"}, defaults={"crv_repetitie_id"=null})
 	 * @Auth(P_CORVEE_MOD)
 	 */
-	public function opslaan(CorveeRepetitie $corveeRepetitie) {
+	public function opslaan(CorveeRepetitie $corveeRepetitie = null) {
 		if ($corveeRepetitie) {
 			$view = $this->bewerk($corveeRepetitie);
 		} else {
@@ -125,6 +126,11 @@ class CorveeRepetitiesController {
 
 			// Voor bijwerken
 			$this->repetitie = $repetitie;
+			if (!empty($repetitie->mlt_repetitie_id)) {
+				$repetitie->maaltijdRepetitie = $this->entityManager->getRepository(MaaltijdRepetitie::class)->find($repetitie->mlt_repetitie_id);
+			} else {
+				$repetitie->maaltijdRepetitie = null;
+			}
 
 			$this->entityManager->persist($repetitie);
 			$this->entityManager->flush();
@@ -137,7 +143,7 @@ class CorveeRepetitiesController {
 				}
 			}
 
-			return view('maaltijden.corveerepetitie.beheer_corvee_repetitie', ['repetitie' => $repetitie]);
+			return $this->render('maaltijden/corveerepetitie/beheer_corvee_repetitie.html.twig', ['repetitie' => $repetitie]);
 		}
 
 		return $view;
@@ -145,7 +151,7 @@ class CorveeRepetitiesController {
 
 	/**
 	 * @param CorveeRepetitie $corveeRepetitie
-	 * @Route("/corvee/repetities/verwijder/{crv_repetitie_id}", methods={"POST"})
+	 * @Route("/corvee/repetities/verwijder/{crv_repetitie_id<\d+>}", methods={"POST"})
 	 * @Auth(P_CORVEE_MOD)
 	 */
 	public function verwijder(CorveeRepetitie $corveeRepetitie) {
@@ -160,11 +166,11 @@ class CorveeRepetitiesController {
 
 	/**
 	 * @param CorveeRepetitie $corveeRepetitie
-	 * @return CorveeRepetitieForm|TemplateView
+	 * @return CorveeRepetitieForm|Response
 	 * @throws ORMException
 	 * @throws OptimisticLockException
 	 * @throws Throwable
-	 * @Route("/corvee/repetities/bijwerken/{crv_repetitie_id}", methods={"POST"})
+	 * @Route("/corvee/repetities/bijwerken/{crv_repetitie_id<\d+>}", methods={"POST"})
 	 * @Auth(P_CORVEE_MOD)
 	 */
 	public function bijwerken(CorveeRepetitie $corveeRepetitie) {

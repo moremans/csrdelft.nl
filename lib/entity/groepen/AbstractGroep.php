@@ -18,6 +18,7 @@ use CsrDelft\view\formulier\DisplayEntity;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
+use Exception;
 use Symfony\Component\Serializer\Annotation as Serializer;
 
 
@@ -34,56 +35,56 @@ abstract class AbstractGroep implements DataTableEntry, DisplayEntity {
 	 * @ORM\Column(type="integer")
 	 * @ORM\Id()
 	 * @ORM\GeneratedValue()
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $id;
 	/**
 	 * Naam
 	 * @var string
 	 * @ORM\Column(type="stringkey")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $naam;
 	/**
 	 * Naam voor opvolging
 	 * @var string
 	 * @ORM\Column(type="stringkey")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $familie;
 	/**
 	 * Datum en tijd begin
 	 * @var DateTimeImmutable
 	 * @ORM\Column(type="datetime")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $begin_moment;
 	/**
 	 * Datum en tijd einde
-	 * @var DateTimeImmutable
-	 * @ORM\Column(type="datetime")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @var DateTimeImmutable|null
+	 * @ORM\Column(type="datetime", nullable=true)
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $eind_moment;
 	/**
 	 * o.t. / h.t. / f.t.
 	 * @var GroepStatus
 	 * @ORM\Column(type="enumGroepStatus")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $status;
 	/**
 	 * Korte omschrijving
 	 * @var string
 	 * @ORM\Column(type="text")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $samenvatting;
 	/**
 	 * Lange omschrijving
 	 * @var string
 	 * @ORM\Column(type="text", nullable=true)
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
 	public $omschrijving;
 	/**
@@ -99,14 +100,15 @@ abstract class AbstractGroep implements DataTableEntry, DisplayEntity {
 	 */
 	public $maker;
 	/**
-	 * @var string
-	 * @ORM\Column(type="string")
-	 * @Serializer\Groups({"datatable", "log"})
+	 * @var GroepVersie
+	 * @ORM\Column(type="enumGroepVersie")
+	 * @Serializer\Groups({"datatable", "log", "vue"})
 	 */
-	public $versie = GroepVersie::V1;
+	public $versie;
 	/**
 	 * @var GroepKeuze[]
 	 * @ORM\Column(type="groepkeuze", nullable=true)
+	 * @Serializer\Groups("vue")
 	 */
 	public $keuzelijst2;
 
@@ -120,6 +122,10 @@ abstract class AbstractGroep implements DataTableEntry, DisplayEntity {
 	 * @return string|AbstractGroepLid
 	 */
 	abstract public function getLidType();
+
+	public function __construct() {
+		$this->versie = GroepVersie::V1();
+	}
 
 	/**
 	 * @return string
@@ -136,8 +142,22 @@ abstract class AbstractGroep implements DataTableEntry, DisplayEntity {
 
 	/**
 	 * @return AbstractGroepLid[]|ArrayCollection
+	 * @Serializer\Groups("vue")
 	 */
 	abstract public function getLeden();
+
+	public function getLedenOpAchternaamGesorteerd() {
+		$leden = $this->getLeden();
+		try {
+			$iterator = $leden->getIterator();
+			$iterator->uasort(function (AbstractGroepLid $a, AbstractGroepLid $b) {
+				return strcmp($a->profiel->achternaam, $b->profiel->achternaam) ?: strnatcmp($a->uid, $b->uid);
+			});
+		} catch (Exception $e) {
+			return $leden;
+		}
+		return new ArrayCollection(iterator_to_array($iterator));
+	}
 
 	public function getFamilieSuggesties() {
 		$em = ContainerFacade::getContainer()->get('doctrine.orm.entity_manager');
@@ -270,6 +290,6 @@ abstract class AbstractGroep implements DataTableEntry, DisplayEntity {
 	}
 
 	public function getWeergave(): string {
-		return $this->naam;
+		return $this->naam ?? "";
 	}
 }

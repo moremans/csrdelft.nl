@@ -8,7 +8,6 @@ use Doctrine\ORM\Mapping as ORM;
  * Class VoorkeurCommissie
  * @package CsrDelft\entity\commissievoorkeuren
  * @ORM\Entity(repositoryClass="CsrDelft\repository\commissievoorkeuren\VoorkeurCommissieRepository")
- * @ORM\Table("voorkeurCommissie")
  */
 class VoorkeurCommissie {
 	/**
@@ -33,7 +32,7 @@ class VoorkeurCommissie {
 
 	/**
 	 * @var integer
-	 * @ORM\Column(type="integer")
+	 * @ORM\Column(type="integer", options={"default"=1})
 	 */
 	public $categorie_id;
 

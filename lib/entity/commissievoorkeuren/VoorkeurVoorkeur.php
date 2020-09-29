@@ -2,6 +2,7 @@
 
 namespace CsrDelft\entity\commissievoorkeuren;
 
+use CsrDelft\common\ContainerFacade;
 use CsrDelft\entity\profiel\Profiel;
 use CsrDelft\service\AccessService;
 use DateTimeImmutable;
@@ -11,7 +12,6 @@ use Doctrine\ORM\Mapping as ORM;
  * Class VoorkeurVoorkeur
  * @package CsrDelft\model\entity\commissievoorkeuren
  * @ORM\Entity(repositoryClass="CsrDelft\repository\commissievoorkeuren\CommissieVoorkeurRepository")
- * @ORM\Table("voorkeurVoorkeur")
  */
 class VoorkeurVoorkeur {
 	/**
@@ -83,6 +83,11 @@ class VoorkeurVoorkeur {
 	}
 
 	public function heeftGedaan() {
-		return AccessService::mag($this->profiel->account, 'commissie:' . $this->commissie->naam . ',commissie:' . $this->commissie->naam . ':ot');
+		return ContainerFacade::getContainer()->get(AccessService::class)
+			->mag($this->profiel->account, 'commissie:' . $this->commissie->naam . ',commissie:' . $this->commissie->naam . ':ot');
+	}
+
+	public function getVoorkeurTekst() {
+		return ['', 'nee', 'ja', 'misschien'][$this->voorkeur];
 	}
 }

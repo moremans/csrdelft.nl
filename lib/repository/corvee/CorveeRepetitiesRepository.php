@@ -32,6 +32,7 @@ class CorveeRepetitiesRepository extends AbstractRepository {
 	public function nieuw(MaaltijdRepetitie $maaltijdRepetitie = null) {
 		$repetitie = new CorveeRepetitie();
 		$repetitie->crv_repetitie_id = null;
+		$repetitie->maaltijdRepetitie = $maaltijdRepetitie;
 		$repetitie->mlt_repetitie_id = $maaltijdRepetitie->mlt_repetitie_id ?? null;
 		$repetitie->dag_vd_week = intval(instelling('corvee', 'standaard_repetitie_weekdag'));
 		$repetitie->periode_in_dagen = intval(instelling('corvee', 'standaard_repetitie_periode'));
@@ -50,7 +51,7 @@ class CorveeRepetitiesRepository extends AbstractRepository {
 		if ($shift > 0) {
 			$datum = strtotime('+' . $shift . ' days', $datum);
 		}
-		return date('Y-m-d', $datum);
+		return date_create_immutable('@' . $datum);
 	}
 
 	/**

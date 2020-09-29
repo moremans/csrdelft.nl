@@ -93,8 +93,8 @@ class CorveeToewijzenService {
 			} else {
 				$corveePuntenOverzichten[$uid]->recent = false;
 			}
-			if ($taak->crv_repetitie_id !== null) {
-				$corveePuntenOverzichten[$uid]->voorkeur = ContainerFacade::getContainer()->get(CorveeVoorkeurenRepository::class)->getHeeftVoorkeur($taak->crv_repetitie_id, $uid);
+			if ($taak->corveeRepetitie !== null) {
+				$corveePuntenOverzichten[$uid]->voorkeur = ContainerFacade::getContainer()->get(CorveeVoorkeurenRepository::class)->getHeeftVoorkeur($taak->corveeRepetitie->crv_repetitie_id, $uid);
 			} else {
 				$corveePuntenOverzichten[$uid]->voorkeur = false;
 			}
@@ -103,13 +103,13 @@ class CorveeToewijzenService {
 		return $corveePuntenOverzichten;
 	}
 
-	function sorteerKwali(CorveePuntenOverzichtDTO $a, CorveePuntenOverzichtDTO $b) {
-		if ($a->laatste !== false && $b->laatste !== false) {
+	public function sorteerKwali(CorveePuntenOverzichtDTO $a, CorveePuntenOverzichtDTO $b) {
+		if (!$a->laatste && !$b->laatste) {
 			$a = $a->laatste->getBeginMoment();
 			$b = $b->laatste->getBeginMoment();
-		} elseif ($a->laatste === false) {
+		} elseif (!$a->laatste) {
 			return -1;
-		} elseif ($b->laatste === false) {
+		} elseif (!$b->laatste) {
 			return 1;
 		} else {
 			$a = $a->aantal;
@@ -124,7 +124,7 @@ class CorveeToewijzenService {
 		}
 	}
 
-	function sorteerPrognose(CorveePuntenOverzichtDTO $a, CorveePuntenOverzichtDTO $b) {
+	public function sorteerPrognose(CorveePuntenOverzichtDTO $a, CorveePuntenOverzichtDTO $b) {
 		$a = $a->prognose;
 		$b = $b->prognose;
 		if ($a === $b) {

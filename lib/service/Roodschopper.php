@@ -15,6 +15,7 @@ namespace CsrDelft\service;
 
 use CsrDelft\common\ContainerFacade;
 use CsrDelft\common\Mail;
+use CsrDelft\entity\fiscaat\CiviSaldo;
 use CsrDelft\entity\profiel\Profiel;
 use CsrDelft\model\entity\LidStatus;
 use CsrDelft\repository\fiscaat\CiviSaldoRepository;
@@ -39,7 +40,7 @@ class Roodschopper {
 
 	public static function getDefaults() {
 		$return = new Roodschopper();
-		$return->from = env('EMAIL_FISCUS');
+		$return->from = $_ENV['EMAIL_FISCUS'];
 		$return->verzenden = false;
 		$return->saldogrens = -520;
 		$return->onderwerp = 'U staat rood';
@@ -71,6 +72,9 @@ h.t. Fiscus.';
 		return $leden;
 	}
 
+	/**
+	 * @return CiviSaldo[]
+	 */
 	public function getSaldi() {
 		if ($this->doelgroep == 'oudleden') {
 			$status = LidStatus::getFiscaalOudlidLike();
@@ -155,7 +159,7 @@ h.t. Fiscus.';
 			if (!$profiel) {
 				continue;
 			}
-			$mail = new Mail(array($profiel->getPrimaryEmail() => $profiel->getNaam($uid, 'civitas')), $this->onderwerp, $bericht['bericht']);
+			$mail = new Mail($profiel->getEmailOntvanger(), $this->onderwerp, $bericht['bericht']);
 			$mail->setFrom($this->from);
 			if ($this->bcc) {
 				$mail->addBcc([$this->bcc => $this->bcc]);

@@ -6,6 +6,7 @@ use CsrDelft\entity\security\enum\AccessAction;
 use CsrDelft\service\security\LoginService;
 use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 
 /**
@@ -14,13 +15,18 @@ use Doctrine\ORM\Mapping as ORM;
  * @author P.W.G. Brussee <brussee@live.nl>
  *
  * @ORM\Entity(repositoryClass="CsrDelft\repository\groepen\WerkgroepenRepository")
- * @ORM\Table("werkgroepen")
+ * @ORM\Table("werkgroepen", indexes={
+ *   @ORM\Index(name="begin_moment", columns={"begin_moment"}),
+ *   @ORM\Index(name="familie", columns={"familie"}),
+ *   @ORM\Index(name="status", columns={"status"}),
+ * })
  */
 class Werkgroep extends AbstractGroep {
 	/**
 	 * Maximaal aantal groepsleden
 	 * @var string
 	 * @ORM\Column(type="integer", nullable=true)
+	 * @Groups({"datatable", "log", "vue"})
 	 */
 	public $aanmeld_limiet;
 	/**
@@ -51,6 +57,7 @@ class Werkgroep extends AbstractGroep {
 	/**
 	 * @var WerkgroepDeelnemer[]
 	 * @ORM\OneToMany(targetEntity="WerkgroepDeelnemer", mappedBy="groep")
+	 * @ORM\OrderBy({"lid_sinds"="ASC"})
 	 */
 	public $leden;
 

@@ -2,32 +2,39 @@
 
 namespace CsrDelft\view\maalcie\forms;
 
-use CsrDelft\common\ContainerFacade;
+use CsrDelft\entity\corvee\CorveePuntenOverzichtDTO;
 use CsrDelft\entity\corvee\CorveeTaak;
 use CsrDelft\repository\groepen\LichtingenRepository;
-use CsrDelft\repository\corvee\CorveeRepetitiesRepository;
 use CsrDelft\view\formulier\FormElement;
 use CsrDelft\view\ToResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Twig\Environment;
 
 class SuggestieLijst implements ToResponse, FormElement {
 
+	/**
+	 * @var CorveePuntenOverzichtDTO[]
+	 */
 	private $suggesties;
 	private $taak;
 	private $voorkeurbaar;
 	private $voorkeur;
 	private $recent;
+	/**
+	 * @var Environment
+	 */
+	private $twig;
 
 	public function __construct(
 		array $suggesties,
+		Environment $twig,
 		CorveeTaak $taak
 	) {
 		$this->suggesties = $suggesties;
 		$this->taak = $taak;
 
-		$crid = $taak->crv_repetitie_id;
-		if ($crid !== null) {
-			$this->voorkeurbaar = ContainerFacade::getContainer()->get(CorveeRepetitiesRepository::class)->getRepetitie($crid)->voorkeurbaar;
+		if ($taak->corveeRepetitie !== null) {
+			$this->voorkeurbaar = $taak->corveeRepetitie->voorkeurbaar;
 		}
 
 		if ($taak->corveeFunctie->kwalificatie_benodigd) {
@@ -37,17 +44,18 @@ class SuggestieLijst implements ToResponse, FormElement {
 			$this->voorkeur = instelling('corvee', 'suggesties_voorkeur_filter');
 			$this->recent = instelling('corvee', 'suggesties_recent_filter');
 		}
+		$this->twig = $twig;
 	}
 
 	public function getHtml() {
-		return view('maaltijden.corveetaak.suggesties_lijst', [
+		return $this->twig->render('maaltijden/corveetaak/suggesties_lijst.html.twig', [
 			'suggesties' => $this->suggesties,
 			'jongsteLichting' => LichtingenRepository::getJongsteLidjaar(),
 			'voorkeur' => $this->voorkeur,
 			'recent' => $this->recent,
 			'voorkeurbaar' => $this->voorkeurbaar,
 			'kwalificatie_benodigd' => $this->taak->corveeFunctie->kwalificatie_benodigd,
-		])->getHtml();
+		]);
 	}
 
 	public function view() {

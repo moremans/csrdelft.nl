@@ -4,10 +4,11 @@ namespace CsrDelft\controller;
 
 use CsrDelft\common\Annotation\Auth;
 use CsrDelft\repository\instellingen\LidInstellingenRepository;
-use CsrDelft\service\security\LoginService;
-use CsrDelft\view\JsonResponse;
-use CsrDelft\view\renderer\TemplateView;
+use CsrDelft\view\login\RememberLoginTable;
 use Exception;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 
@@ -25,18 +26,20 @@ class LidInstellingenController extends AbstractController {
 	}
 
 	/**
-	 * @return TemplateView
+	 * @return Response
 	 * @Route("/instellingen", methods={"GET"})
 	 * @Auth(P_LOGGED_IN)
 	 */
 	public function beheer() {
-		return view('instellingen.lidinstellingen', [
+		return $this->render('instellingen/lidinstellingen.html.twig', [
 			'defaultInstellingen' => $this->lidInstellingenRepository->getAll(),
-			'instellingen' => $this->lidInstellingenRepository->getAllForLid(LoginService::getUid())
+			'instellingen' => $this->lidInstellingenRepository->getAllForLid($this->getUid()),
+			'rememberLoginTable' => new RememberLoginTable(),
 		]);
 	}
 
 	/**
+	 * @param Request $request
 	 * @param $module
 	 * @param $instelling
 	 * @param null $waarde
@@ -44,9 +47,9 @@ class LidInstellingenController extends AbstractController {
 	 * @Route("/instellingen/update/{module}/{instelling}/{waarde}", methods={"POST"}, defaults={"waarde": null})
 	 * @Auth(P_LOGGED_IN)
 	 */
-	public function update($module, $instelling, $waarde = null) {
+	public function update(Request $request, $module, $instelling, $waarde = null) {
 		if ($waarde === null) {
-			$waarde = filter_input(INPUT_POST, 'waarde', FILTER_SANITIZE_STRING);
+			$waarde = $request->request->get('waarde');
 		}
 
 		if ($this->lidInstellingenRepository->isValidValue($module, $instelling, urldecode($waarde))) {

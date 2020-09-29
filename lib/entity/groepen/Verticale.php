@@ -9,6 +9,7 @@ use CsrDelft\model\entity\LidStatus;
 use CsrDelft\repository\ProfielRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation as Serializer;
 
 /**
  * Verticale.class.php
@@ -16,19 +17,32 @@ use Doctrine\ORM\Mapping as ORM;
  * @author P.W.G. Brussee <brussee@live.nl>
  *
  * @ORM\Entity(repositoryClass="CsrDelft\repository\groepen\VerticalenRepository")
- * @ORM\Table("verticalen")
+ * @ORM\Table("verticalen", indexes={
+ *   @ORM\Index(name="begin_moment", columns={"begin_moment"}),
+ *   @ORM\Index(name="familie", columns={"familie"}),
+ *   @ORM\Index(name="status", columns={"status"}),
+ * })
  */
 class Verticale extends AbstractGroep {
 	/**
 	 * Primary key
 	 * @var string
-	 * @ORM\Column(type="string")
+	 * @ORM\Column(type="string", unique=true, length=1, options={"fixed"=true})
 	 */
 	public $letter;
 
 	/**
+	 * Naam
+	 * @var string
+	 * @ORM\Column(type="stringkey", unique=true)
+	 * @Serializer\Groups({"datatable", "log", "vue"})
+	 */
+	public $naam;
+
+	/**
 	 * @var VerticaleLid[]
 	 * @ORM\OneToMany(targetEntity="VerticaleLid", mappedBy="groep")
+	 * @ORM\OrderBy({"uid"="ASC"})
 	 */
 	public $leden;
 
@@ -54,6 +68,7 @@ class Verticale extends AbstractGroep {
 					$lid->opmerking = 'Kringcoach';
 				}
 				$lid->door_uid = null;
+				$lid->door_profiel = null;
 				$lid->lid_sinds = date_create_immutable($profiel->lidjaar . '-09-01 00:00:00');
 				$leden[] = $lid;
 			}

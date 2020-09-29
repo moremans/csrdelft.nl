@@ -6,7 +6,6 @@ use Doctrine\ORM\Mapping as ORM;
 
 /**
  * @package CsrDelft\entity\fiscaat
- * @ORM\Table("CiviLog")
  * @ORM\Entity(repositoryClass="CsrDelft\repository\fiscaat\CiviSaldoLogRepository")
  */
 class CiviSaldoLog {
@@ -35,7 +34,7 @@ class CiviSaldoLog {
 	public $data;
 	/**
 	 * @var \DateTimeImmutable
-	 * @ORM\Column(type="datetime")
+	 * @ORM\Column(type="datetime", options={"default"="CURRENT_TIMESTAMP"})
 	 */
 	public $timestamp;
 }

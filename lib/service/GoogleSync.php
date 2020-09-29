@@ -85,7 +85,7 @@ class GoogleSync {
 
 	public function init() {
 		$google_token = $this->googleTokenRepository->find(LoginService::getUid());
-		if ($google_token === false) {
+		if (!$google_token) {
 			throw new CsrException('Authsub token not available, use doRequestToken.');
 		}
 
@@ -96,10 +96,8 @@ class GoogleSync {
 			}
 		}
 
-		$client = self::createGoogleCLient();
-		$client->fetchAccessTokenWithRefreshToken($google_token->token);
-
-		$this->client = $client;
+		$this->client = self::createGoogleCLient();
+		$this->client->fetchAccessTokenWithRefreshToken($google_token->token);
 
 		try {
 			//first load group feed, find or create the groupname from the user settings.
@@ -166,7 +164,9 @@ class GoogleSync {
 			$this->contactData = array();
 			foreach ($this->contactFeed as $contact) {
 				$unpacked = $this->unpackGoogleContact($contact);
-				if ($unpacked) $this->contactData[] = $unpacked;
+				if ($unpacked) {
+					$this->contactData[] = $unpacked;
+				}
 			}
 		}
 
@@ -184,7 +184,9 @@ class GoogleSync {
 		$this->fixSimpleXMLNameSpace($contact);
 
 		$uid = $contact->xpath('gContact:userDefinedField[@key="csruid"]');
-		if (count($uid) === 0) return null; // Geen Uid, niet van ons.
+		if (empty($uid)) {
+			return null;
+		} // Geen Uid, niet van ons.
 		$uid = $uid[0];
 		$link = $contact->xpath('_:link[@rel="self"]')[0];
 		$photoLink = $contact->xpath('_:link[@rel="http://schemas.google.com/contacts/2008/rel#photo"]')[0];
@@ -210,7 +212,9 @@ class GoogleSync {
 	 * @return null|array met het google-id in het geval van voorkomen, anders null.
 	 */
 	public function existsInGoogleContacts(Profiel $profiel) {
-		if (!$this->isAuthenticated()) return null;
+		if (!$this->isAuthenticated()) {
+			return null;
+		}
 
 		$name = strtolower($profiel->getNaam());
 		foreach ($this->getGoogleContacts() as $contact) {
@@ -241,7 +245,7 @@ class GoogleSync {
 	/**
 	 * Get array with group[name] => id
 	 */
-	function getGroups() {
+	public function getGroups() {
 		$return = array();
 		foreach ($this->groupFeed as $group) {
 			$this->fixSimpleXMLNameSpace($group);
@@ -344,7 +348,7 @@ class GoogleSync {
 				$profielBatch[] = $profiel;
 			} else {
 				$profiel = ProfielRepository::get($profiel);
-				if ($profiel !== false) {
+				if ($profiel) {
 					$profielBatch[] = $profiel;
 				}
 			}
@@ -408,7 +412,7 @@ class GoogleSync {
 
 				$contact = $this->unpackGoogleContact($contact);
 				$profiel = ProfielRepository::get($contact['csruid']);
-				if ($profiel !== false) {
+				if ($profiel) {
 					$this->updatePhoto($contact, $profiel);
 				}
 			}
@@ -490,8 +494,9 @@ class GoogleSync {
 
 		$path = $profiel->getPasfotoInternalPath(true);
 
-		if ($path === null)
+		if ($path === null) {
 			return;
+		}
 
 		$headers = array('GData-Version' => '3.0', 'Content-Type' => "image/*");
 
@@ -687,8 +692,8 @@ class GoogleSync {
 		$redirect_uri = CSR_ROOT . '/google/callback';
 		$client = new Google_Client();
 		$client->setApplicationName('Stek');
-		$client->setClientId(env('GOOGLE_CLIENT_ID'));
-		$client->setClientSecret(env('GOOGLE_CLIENT_SECRET'));
+		$client->setClientId($_ENV['GOOGLE_CLIENT_ID']);
+		$client->setClientSecret($_ENV['GOOGLE_CLIENT_SECRET']);
 		$client->setRedirectUri($redirect_uri);
 		$client->setAccessType('offline');
 		// Zonder force kunnen we nog een oude sessie krijgen (zonder refresh token)

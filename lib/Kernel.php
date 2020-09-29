@@ -44,9 +44,6 @@ class Kernel extends BaseKernel {
 
 	protected function build(ContainerBuilder $builder) {
 		$builder->registerForAutoconfiguration(FormulierTypeInterface::class)->addTag('csr.formulier.type');
-	}
-
-	protected function build(ContainerBuilder $builder) {
 		$builder->registerForAutoconfiguration(DataTableTypeInterface::class)->addTag('csr.table.type');
 	}
 }

@@ -101,7 +101,7 @@ class BbMaaltijd extends BbTag {
 			]);
 		}
 		if (count($this->maaltijden) > 1 && $this->content !== 'beoordeling') {
-			$result .= '<div class="d-block mt-3 text-right"><a href="/maaltijden/ketzer">Alle maaltijden</a></div>';
+			$result .= '<div class="d-block mt-3 text-end"><a href="/maaltijden/ketzer">Alle maaltijden</a></div>';
 		}
 		return $result . '</div>';
 	}
